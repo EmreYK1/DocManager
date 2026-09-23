@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:17
+    container_name: docmanager-db
+    environment:
+      POSTGRES_DB: docmanager
+      POSTGRES_USER: docmanager
+      POSTGRES_PASSWORD: docmanager
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docmanager -d docmanager"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  document-service:
+    build:
+      context: .
+      dockerfile: document-service/Dockerfile
+    container_name: docmanager-document-service
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/docmanager
+      DB_USER: docmanager
+      DB_PASSWORD: docmanager
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:

@@ -166,4 +166,31 @@ class FolderServiceTest {
 
         assertThat(result).isEmpty();
     }
+
+    // ─── findChildren ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("findChildren() lädt den Parent per ID und gibt dessen Unterordner zurück")
+    void findChildren_returnsChildrenOfParent() {
+        when(folderRepository.findById(rootId)).thenReturn(Optional.of(rootFolder));
+        when(folderRepository.findByParent(rootFolder)).thenReturn(List.of(childFolder));
+
+        List<Folder> result = folderService.findChildren(rootId);
+
+        assertThat(result).containsExactly(childFolder);
+        verify(folderRepository).findByParent(rootFolder);
+    }
+
+    @Test
+    @DisplayName("findChildren() wirft RuntimeException wenn Parent nicht existiert")
+    void findChildren_throwsException_whenParentNotFound() {
+        UUID unknownId = UUID.randomUUID();
+        when(folderRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> folderService.findChildren(unknownId))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Folder not found");
+
+        verify(folderRepository, never()).findByParent(any());
+    }
 }

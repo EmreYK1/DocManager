@@ -1,6 +1,9 @@
 package com.docmanager.document.controller;
 
+import com.docmanager.document.dto.FolderRequest;
+import com.docmanager.document.dto.FolderResponse;
 import com.docmanager.document.entity.Folder;
+import com.docmanager.document.mapper.FolderMapper;
 import com.docmanager.document.service.FolderService;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,23 +20,38 @@ public class FolderController {
     }
 
     @PostMapping
-    public Folder create(@RequestBody Folder folder){
-        return folderService.save(folder);
+    public FolderResponse create(@RequestBody FolderRequest request) {
+        Folder parent = request.getParentId() != null
+                ? folderService.findById(request.getParentId())
+                : null;
+        return FolderMapper.toResponse(folderService.save(new Folder(request.getName(), parent)));
     }
 
     @GetMapping("/{id}")
-    public Folder getOne(@PathVariable UUID id){
-        return folderService.findById(id);
+    public FolderResponse getOne(@PathVariable UUID id) {
+        return FolderMapper.toResponse(folderService.findById(id));
     }
 
     @GetMapping
-    public List<Folder> getAll(){
-        return folderService.findAll();
+    public List<FolderResponse> getAll() {
+        return folderService.findAll().stream()
+                .map(FolderMapper::toResponse)
+                .toList();
+    }
+
+    @GetMapping("/{id}/children")
+    public List<FolderResponse> getChildren(@PathVariable UUID id) {
+        return folderService.findChildren(id).stream()
+                .map(FolderMapper::toResponse)
+                .toList();
     }
 
     @PutMapping("/{id}")
-    public Folder update(@PathVariable UUID id, @RequestBody Folder folder) {
-        return folderService.update(id, folder);
+    public FolderResponse update(@PathVariable UUID id, @RequestBody FolderRequest request) {
+        Folder parent = request.getParentId() != null
+                ? folderService.findById(request.getParentId())
+                : null;
+        return FolderMapper.toResponse(folderService.update(id, new Folder(request.getName(), parent)));
     }
 
     @DeleteMapping("/{id}")

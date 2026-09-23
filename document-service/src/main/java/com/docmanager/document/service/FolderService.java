@@ -43,4 +43,9 @@ public class FolderService {
     public List<Folder> findByParent(Folder parent) {
         return folderRepository.findByParent(parent);
     }
+
+    public List<Folder> findChildren(UUID parentId) {
+        Folder parent = findById(parentId);
+        return folderRepository.findByParent(parent);
+    }
 }

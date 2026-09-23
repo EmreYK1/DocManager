@@ -33,6 +33,7 @@ public class DocumentService {
         Document existing = findById(id);
         existing.setFilename(updated.getFilename());
         existing.setStatus(updated.getStatus());
+        existing.setFolder(updated.getFolder());
         return documentRepository.save(existing);
     }
 
