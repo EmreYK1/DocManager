@@ -31,5 +31,14 @@ services:
       db:
         condition: service_healthy
 
+  ui:                        # ← 2 Leerzeichen Einrückung wie db und document-service
+    build:
+      context: ./ui
+    container_name: docmanager-ui
+    ports:
+      - "80:80"
+    depends_on:
+      - document-service
+
 volumes:
   db-data:
