@@ -1,51 +1,23 @@
 package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Folder;
-import com.docmanager.document.repository.FolderRepository;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
-@Service
-public class FolderService {
+public interface FolderService {
 
-    private final FolderRepository folderRepository;
+    Folder save(Folder folder);
 
-    public FolderService(FolderRepository folderRepository) {
-        this.folderRepository = folderRepository;
-    }
+    Folder findById(UUID id);
 
-    public Folder save(Folder folder) {
-        return folderRepository.save(folder);
-    }
+    List<Folder> findAll();
 
-    public Folder findById(UUID id) {
-        return folderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Folder not found: " + id));
-    }
+    Folder update(UUID id, Folder updated);
 
-    public List<Folder> findAll() {
-        return folderRepository.findAll();
-    }
+    void delete(UUID id);
 
-    public Folder update(UUID id, Folder updated) {
-        Folder existing = findById(id);
-        existing.setName(updated.getName());
-        existing.setParent(updated.getParent());
-        return folderRepository.save(existing);
-    }
+    List<Folder> findByParent(Folder parent);
 
-    public void delete(UUID id) {
-        folderRepository.deleteById(id);
-    }
-
-    public List<Folder> findByParent(Folder parent) {
-        return folderRepository.findByParent(parent);
-    }
-
-    public List<Folder> findChildren(UUID parentId) {
-        Folder parent = findById(parentId);
-        return folderRepository.findByParent(parent);
-    }
+    List<Folder> findChildren(UUID parentId);
 }

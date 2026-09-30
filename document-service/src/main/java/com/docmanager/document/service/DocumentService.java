@@ -1,43 +1,19 @@
 package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Document;
-import com.docmanager.document.repository.DocumentRepository;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
-@Service
-public class DocumentService {
+public interface DocumentService {
 
-    private final DocumentRepository documentRepository;
+    Document save(Document document);
 
-    public DocumentService(DocumentRepository documentRepository) {
-        this.documentRepository = documentRepository;
-    }
+    Document findById(UUID id);
 
-    public Document save(Document document) {
-        return documentRepository.save(document);
-    }
+    List<Document> findAll();
 
-    public Document findById(UUID id) {
-        return documentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Document not found: " + id));
-    }
+    Document update(UUID id, Document updated);
 
-    public List<Document> findAll() {
-        return documentRepository.findAll();
-    }
-
-    public Document update(UUID id, Document updated) {
-        Document existing = findById(id);
-        existing.setFilename(updated.getFilename());
-        existing.setStatus(updated.getStatus());
-        existing.setFolder(updated.getFolder());
-        return documentRepository.save(existing);
-    }
-
-    public void delete(UUID id) {
-        documentRepository.deleteById(id);
-    }
+    void delete(UUID id);
 }

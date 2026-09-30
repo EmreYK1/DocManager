@@ -3,6 +3,7 @@ package com.docmanager.document.service;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.entity.DocumentStatus;
 import com.docmanager.document.repository.DocumentRepository;
+import com.docmanager.document.service.impl.DocumentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,7 @@ class DocumentServiceTest {
     private DocumentRepository documentRepository;
 
     @InjectMocks
-    private DocumentService documentService;
+    private DocumentServiceImpl documentService;
 
     private Document sampleDoc;
     private UUID sampleId;

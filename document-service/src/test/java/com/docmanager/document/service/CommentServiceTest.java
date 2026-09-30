@@ -3,6 +3,7 @@ package com.docmanager.document.service;
 import com.docmanager.document.entity.Comment;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.repository.CommentRepository;
+import com.docmanager.document.service.impl.CommentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class CommentServiceTest {
     private DocumentService documentService;
 
     @InjectMocks
-    private CommentService commentService;
+    private CommentServiceImpl commentService;
 
     private Document sampleDoc;
     private Comment sampleComment;

@@ -2,6 +2,7 @@ package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Folder;
 import com.docmanager.document.repository.FolderRepository;
+import com.docmanager.document.service.impl.FolderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class FolderServiceTest {
     private FolderRepository folderRepository;
 
     @InjectMocks
-    private FolderService folderService;
+    private FolderServiceImpl folderService;
 
     private Folder rootFolder;
     private Folder childFolder;
