@@ -5,6 +5,7 @@ import com.docmanager.document.entity.DocumentStatus;
 import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.impl.DocumentServiceImpl;
+import com.docmanager.document.service.DocumentUpdate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,9 @@ class DocumentServiceTest {
     @Mock
     private DocumentRepository documentRepository;
 
+    @Mock
+    private FolderService folderService;
+
     @InjectMocks
     private DocumentServiceImpl documentService;
 
@@ -47,17 +51,18 @@ class DocumentServiceTest {
         }
     }
 
-    // ─── save ────────────────────────────────────────────────────────────────
+    // ─── create ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("save() ruft repository.save() auf und gibt das Dokument zurück")
-    void save_delegatesToRepository() {
-        when(documentRepository.save(sampleDoc)).thenReturn(sampleDoc);
+    @DisplayName("create() erstellt Dokument mit UPLOADED Status ohne Folder wenn folderId null")
+    void create_withoutFolder_createsDocument() {
+        when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Document result = documentService.save(sampleDoc);
+        Document result = documentService.create("neu.pdf", "application/pdf", 512L, null);
 
-        assertThat(result).isEqualTo(sampleDoc);
-        verify(documentRepository, times(1)).save(sampleDoc);
+        assertThat(result.getFilename()).isEqualTo("neu.pdf");
+        assertThat(result.getStatus()).isEqualTo(DocumentStatus.UPLOADED);
+        verify(documentRepository).save(any());
     }
 
     // ─── findById ────────────────────────────────────────────────────────────
@@ -115,17 +120,44 @@ class DocumentServiceTest {
     @Test
     @DisplayName("update() aktualisiert Filename und Status und speichert")
     void update_updatesFieldsAndSaves() {
-        Document updated = new Document("renamed.pdf", "application/pdf", 1024L, null);
-        updated.setStatus(DocumentStatus.OCR_DONE);
+        DocumentUpdate update = new DocumentUpdate("renamed.pdf", DocumentStatus.OCR_DONE, null);
 
         when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
         when(documentRepository.save(any(Document.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Document result = documentService.update(sampleId, updated);
+        Document result = documentService.update(sampleId, update);
 
         assertThat(result.getFilename()).isEqualTo("renamed.pdf");
         assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_DONE);
         verify(documentRepository).save(sampleDoc);
+    }
+
+    @Test
+    @DisplayName("Nur Filename ändern -> Status bleibt gleich")
+    void update_onlyFilename_statusRemainsSame() {
+        DocumentUpdate update = new DocumentUpdate("neu.pdf", null, null);
+
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
+        when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Document result = documentService.update(sampleId, update);
+
+        assertThat(result.getFilename()).isEqualTo("neu.pdf");
+        assertThat(result.getStatus()).isEqualTo(DocumentStatus.UPLOADED);
+    }
+
+    @Test
+    @DisplayName("update() ändert nur Status, Filename bleibt gleich")
+    void update_onlyStatus_filenameUnchanged() {
+        DocumentUpdate update = new DocumentUpdate(null, DocumentStatus.OCR_DONE, null);
+
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
+        when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Document result = documentService.update(sampleId, update);
+
+        assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_DONE);
+        assertThat(result.getFilename()).isEqualTo("test.pdf");
     }
 
     @Test
@@ -134,7 +166,7 @@ class DocumentServiceTest {
         UUID unknownId = UUID.randomUUID();
         when(documentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> documentService.update(unknownId, sampleDoc))
+        assertThatThrownBy(() -> documentService.update(unknownId, new DocumentUpdate(null, null, null)))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Document not found");
 
