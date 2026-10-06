@@ -31,5 +31,14 @@ services:
       db:
         condition: service_healthy
 
+  webui:
+    build:
+      context: ./webui
+    container_name: docmanager-webui
+    ports:
+      - "80:80"
+    depends_on:
+      - document-service
+
 volumes:
   db-data:
