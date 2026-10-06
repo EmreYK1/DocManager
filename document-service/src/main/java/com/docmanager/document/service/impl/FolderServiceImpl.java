@@ -1,6 +1,7 @@
 package com.docmanager.document.service.impl;
 
 import com.docmanager.document.entity.Folder;
+import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.FolderRepository;
 import com.docmanager.document.service.FolderService;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,7 @@ public class FolderServiceImpl implements FolderService {
     @Override
     public Folder findById(UUID id) {
         return folderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Folder not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Folder not found: " + id));
     }
 
     @Override
