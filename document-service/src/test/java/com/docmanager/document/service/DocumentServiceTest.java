@@ -2,6 +2,7 @@ package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.entity.DocumentStatus;
+import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.impl.DocumentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,13 +74,13 @@ class DocumentServiceTest {
     }
 
     @Test
-    @DisplayName("findById() wirft RuntimeException wenn nicht gefunden")
-    void findById_throwsRuntimeException_whenNotFound() {
+    @DisplayName("findById() wirft NotFoundException wenn nicht gefunden")
+    void findById_throwsNotFoundException_whenNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(documentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentService.findById(unknownId))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Document not found");
 
         verify(documentRepository).findById(unknownId);
@@ -128,13 +129,13 @@ class DocumentServiceTest {
     }
 
     @Test
-    @DisplayName("update() wirft RuntimeException wenn Dokument nicht existiert")
-    void update_throwsException_whenDocumentNotFound() {
+    @DisplayName("update() wirft NotFoundException wenn Dokument nicht existiert")
+    void update_throwsNotFoundException_whenDocumentNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(documentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentService.update(unknownId, sampleDoc))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Document not found");
 
         verify(documentRepository, never()).save(any());

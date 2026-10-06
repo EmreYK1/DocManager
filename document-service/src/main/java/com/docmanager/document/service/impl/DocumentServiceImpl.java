@@ -1,6 +1,7 @@
 package com.docmanager.document.service.impl;
 
 import com.docmanager.document.entity.Document;
+import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.DocumentService;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public Document findById(UUID id) {
         return documentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Document not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Document not found: " + id));
     }
 
     @Override

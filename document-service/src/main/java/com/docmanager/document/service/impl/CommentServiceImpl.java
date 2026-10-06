@@ -2,6 +2,7 @@ package com.docmanager.document.service.impl;
 
 import com.docmanager.document.entity.Comment;
 import com.docmanager.document.entity.Document;
+import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.CommentRepository;
 import com.docmanager.document.service.CommentService;
 import com.docmanager.document.service.DocumentService;
@@ -30,7 +31,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public Comment findById(UUID id) {
         return commentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Comment not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Comment not found: " + id));
     }
 
     @Override
