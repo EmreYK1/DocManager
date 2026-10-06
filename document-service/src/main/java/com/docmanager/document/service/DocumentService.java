@@ -7,13 +7,13 @@ import java.util.UUID;
 
 public interface DocumentService {
 
-    Document save(Document document);
-
     Document findById(UUID id);
 
     List<Document> findAll();
 
-    Document update(UUID id, Document updated);
+    Document create(String filename, String contentType, long sizeBytes, UUID folderID);
+
+    Document update(UUID id, DocumentUpdate update);
 
     void delete(UUID id);
 }
