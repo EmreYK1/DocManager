@@ -1,3 +1,10 @@
+import { Route, Routes } from 'react-router-dom'
+import DashboardPage from './pages/DashboardPage.jsx'
+
 export default function App() {
-  return <h1>DocManager</h1>
+  return (
+    <Routes>
+      <Route path="/" element={<DashboardPage />} />
+    </Routes>
+  )
 }

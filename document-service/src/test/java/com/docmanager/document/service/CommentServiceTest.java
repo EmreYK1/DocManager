@@ -2,6 +2,7 @@ package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Comment;
 import com.docmanager.document.entity.Document;
+import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.CommentRepository;
 import com.docmanager.document.service.impl.CommentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,13 +74,13 @@ class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("save() wirft RuntimeException wenn Document nicht existiert")
-    void save_throwsException_whenDocumentNotFound() {
+    @DisplayName("save() wirft NotFoundException wenn Document nicht existiert")
+    void save_throwsNotFoundException_whenDocumentNotFound() {
         UUID unknownId = UUID.randomUUID();
-        when(documentService.findById(unknownId)).thenThrow(new RuntimeException("Document not found: " + unknownId));
+        when(documentService.findById(unknownId)).thenThrow(new NotFoundException("Document not found: " + unknownId));
 
         assertThatThrownBy(() -> commentService.save(unknownId, "Text", "Bob"))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Document not found");
 
         verify(commentRepository, never()).save(any());
@@ -98,13 +99,13 @@ class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("findById() wirft RuntimeException wenn nicht gefunden")
-    void findById_throwsRuntimeException_whenNotFound() {
+    @DisplayName("findById() wirft NotFoundException wenn nicht gefunden")
+    void findById_throwsNotFoundException_whenNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(commentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> commentService.findById(unknownId))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Comment not found");
     }
 
@@ -149,13 +150,13 @@ class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("update() wirft RuntimeException wenn Comment nicht existiert")
-    void update_throwsException_whenNotFound() {
+    @DisplayName("update() wirft NotFoundException wenn Comment nicht existiert")
+    void update_throwsNotFoundException_whenNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(commentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> commentService.update(unknownId, "Text"))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Comment not found");
 
         verify(commentRepository, never()).save(any());

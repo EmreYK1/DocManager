@@ -1,6 +1,7 @@
 package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Folder;
+import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.FolderRepository;
 import com.docmanager.document.service.impl.FolderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,13 +79,13 @@ class FolderServiceTest {
     }
 
     @Test
-    @DisplayName("findById() wirft RuntimeException wenn Ordner nicht gefunden")
-    void findById_throwsRuntimeException_whenNotFound() {
+    @DisplayName("findById() wirft NotFoundException wenn Ordner nicht gefunden")
+    void findById_throwsNotFoundException_whenNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(folderRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> folderService.findById(unknownId))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Folder not found");
     }
 
@@ -119,13 +120,13 @@ class FolderServiceTest {
     }
 
     @Test
-    @DisplayName("update() wirft RuntimeException wenn Ordner nicht existiert")
-    void update_throwsException_whenFolderNotFound() {
+    @DisplayName("update() wirft NotFoundException wenn Ordner nicht existiert")
+    void update_throwsNotFoundException_whenFolderNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(folderRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> folderService.update(unknownId, rootFolder))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Folder not found");
 
         verify(folderRepository, never()).save(any());
@@ -183,13 +184,13 @@ class FolderServiceTest {
     }
 
     @Test
-    @DisplayName("findChildren() wirft RuntimeException wenn Parent nicht existiert")
-    void findChildren_throwsException_whenParentNotFound() {
+    @DisplayName("findChildren() wirft NotFoundException wenn Parent nicht existiert")
+    void findChildren_throwsNotFoundException_whenParentNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(folderRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> folderService.findChildren(unknownId))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Folder not found");
 
         verify(folderRepository, never()).findByParent(any());
