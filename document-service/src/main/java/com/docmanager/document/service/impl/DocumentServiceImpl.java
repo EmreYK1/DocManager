@@ -47,7 +47,11 @@ public class DocumentServiceImpl implements DocumentService {
         Document existing = findById(id);
         if (update.filename() != null) existing.setFilename(update.filename());
         if (update.status() != null) existing.setStatus(update.status());
-        if (update.folderId() != null) existing.setFolder(folderService.findById(update.folderId()));
+        if (update.clearFolder()) {
+            existing.setFolder(null);
+        } else if (update.folderId() != null) {
+            existing.setFolder(folderService.findById(update.folderId()));
+        }
         return documentRepository.save(existing);
     }
 

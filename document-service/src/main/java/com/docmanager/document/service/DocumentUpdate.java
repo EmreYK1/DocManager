@@ -6,5 +6,6 @@ import com.docmanager.document.entity.DocumentStatus;
 public record DocumentUpdate(
     String filename,
     DocumentStatus status,
-    UUID folderId
+    UUID folderId,
+    boolean clearFolder
 ) {}

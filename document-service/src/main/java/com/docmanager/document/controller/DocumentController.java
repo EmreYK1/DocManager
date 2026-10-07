@@ -40,7 +40,7 @@ public class DocumentController {
 
     @PatchMapping("/{id}")
     public DocumentResponse update(@PathVariable UUID id, @RequestBody DocumentRequest request) {
-        DocumentUpdate update = new DocumentUpdate(request.getFilename(), request.getStatus(), request.getFolderId());
+        DocumentUpdate update = new DocumentUpdate(request.getFilename(), request.getStatus(), request.getFolderId(), request.isClearFolder());
         return DocumentMapper.toResponse(documentService.update(id, update));
     }
 

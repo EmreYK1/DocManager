@@ -2,6 +2,7 @@ package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.entity.DocumentStatus;
+import com.docmanager.document.entity.Folder;
 import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.impl.DocumentServiceImpl;
@@ -120,7 +121,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("update() aktualisiert Filename und Status und speichert")
     void update_updatesFieldsAndSaves() {
-        DocumentUpdate update = new DocumentUpdate("renamed.pdf", DocumentStatus.OCR_DONE, null);
+        DocumentUpdate update = new DocumentUpdate("renamed.pdf", DocumentStatus.OCR_DONE, null, false);
 
         when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
         when(documentRepository.save(any(Document.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -135,7 +136,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("Nur Filename ändern -> Status bleibt gleich")
     void update_onlyFilename_statusRemainsSame() {
-        DocumentUpdate update = new DocumentUpdate("neu.pdf", null, null);
+        DocumentUpdate update = new DocumentUpdate("neu.pdf", null, null, false);
 
         when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
         when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -149,7 +150,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("update() ändert nur Status, Filename bleibt gleich")
     void update_onlyStatus_filenameUnchanged() {
-        DocumentUpdate update = new DocumentUpdate(null, DocumentStatus.OCR_DONE, null);
+        DocumentUpdate update = new DocumentUpdate(null, DocumentStatus.OCR_DONE, null, false);
 
         when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
         when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -161,12 +162,43 @@ class DocumentServiceTest {
     }
 
     @Test
+    @DisplayName("update() setzt neuen Folder wenn folderId angegeben")
+    void update_withFolderId_assignsFolder() {
+        UUID folderId = UUID.randomUUID();
+        Folder folder = new Folder("Rechnungen", null);
+        DocumentUpdate update = new DocumentUpdate(null, null, folderId, false);
+
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
+        when(folderService.findById(folderId)).thenReturn(folder);
+        when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Document result = documentService.update(sampleId, update);
+
+        assertThat(result.getFolder()).isEqualTo(folder);
+    }
+
+    @Test
+    @DisplayName("update() entfernt Folder wenn clearFolder gesetzt ist")
+    void update_withClearFolder_removesFolder() {
+        sampleDoc.setFolder(new Folder("Rechnungen", null));
+        DocumentUpdate update = new DocumentUpdate(null, null, null, true);
+
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
+        when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Document result = documentService.update(sampleId, update);
+
+        assertThat(result.getFolder()).isNull();
+        verify(folderService, never()).findById(any());
+    }
+
+    @Test
     @DisplayName("update() wirft NotFoundException wenn Dokument nicht existiert")
     void update_throwsNotFoundException_whenDocumentNotFound() {
         UUID unknownId = UUID.randomUUID();
         when(documentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> documentService.update(unknownId, new DocumentUpdate(null, null, null)))
+        assertThatThrownBy(() -> documentService.update(unknownId, new DocumentUpdate(null, null, null, false)))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Document not found");
 

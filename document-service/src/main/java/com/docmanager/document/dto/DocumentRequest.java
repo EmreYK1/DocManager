@@ -11,4 +11,5 @@ public class DocumentRequest {
     private long sizeBytes;
     private UUID folderId;
     private DocumentStatus status;
+    private boolean clearFolder;
 }
