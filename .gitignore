@@ -1,5 +1,5 @@
 ﻿target/
 .idea/
 *.class
-webui/node_modules/
+node_modules/
 webui/dist/
