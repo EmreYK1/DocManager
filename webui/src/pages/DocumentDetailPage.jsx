@@ -1,14 +1,15 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import DocumentMetadata from '../components/DocumentMetadata.jsx'
 import DocumentEditForm from '../components/DocumentEditForm.jsx'
 import CommentList from '../components/CommentList.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 import { deleteDocument, getDocument, updateDocument } from '../api/documentApi.js'
-import { getComments } from '../api/commentApi.js'
+import { getComments, createComment } from '../api/commentApi.js'
 import { getFolders } from '../api/folderApi.js'
 import { useApiResource } from '../hooks/useApiResource.js'
 import { buildFolderNameMap } from '../utils/folderNames.js'
+import CommentForm from '../components/CommentForm.jsx'
 
 export default function DocumentDetailPage() {
   const { id } = useParams()
@@ -23,14 +24,26 @@ export default function DocumentDetailPage() {
     error: documentError,
     reload: reloadDocument,
   } = useApiResource(loadDocument)
-  const { data: comments, loading: commentsLoading, error: commentsError } = useApiResource(loadComments)
+  const { data: comments, loading: commentsLoading, error: commentsError, reload: reloadComments } = useApiResource(loadComments)
   const { data: folders } = useApiResource(getFolders)
+  const [commentSubmitError, setCommentSubmitError] = useState(null)
 
   const folderNames = buildFolderNameMap(folders ?? [])
 
   async function handleSave(changes) {
     await updateDocument(id, changes)
     reloadDocument()
+  }
+
+  async function handleComment(data) {
+    setCommentSubmitError(null)
+    try {
+      await createComment(id, data)
+      reloadComments()
+    } catch (err) {
+      setCommentSubmitError(err)
+      throw err
+    }
   }
 
   async function handleDelete() {
@@ -56,6 +69,8 @@ export default function DocumentDetailPage() {
       )}
 
       <h2>Kommentare</h2>
+      <ErrorBanner error={commentSubmitError} />
+      <CommentForm onSubmit={handleComment} />
       {comments && <CommentList comments={comments} />}
     </main>
   )
