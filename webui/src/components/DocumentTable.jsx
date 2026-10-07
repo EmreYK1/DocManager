@@ -1,7 +1,5 @@
-const dateFormatter = new Intl.DateTimeFormat('de-DE', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-})
+import { Link } from 'react-router-dom'
+import { formatDate } from '../utils/formatDate.js'
 
 export default function DocumentTable({ documents, folderNames = new Map() }) {
   if (documents.length === 0) {
@@ -21,10 +19,12 @@ export default function DocumentTable({ documents, folderNames = new Map() }) {
       <tbody>
         {documents.map((document) => (
           <tr key={document.id}>
-            <td>{document.filename}</td>
+            <td>
+              <Link to={`/documents/${document.id}`}>{document.filename}</Link>
+            </td>
             <td>{document.status}</td>
             <td>{folderNames.get(document.folderId) ?? '–'}</td>
-            <td>{dateFormatter.format(new Date(document.uploadedAt))}</td>
+            <td>{formatDate(document.uploadedAt)}</td>
           </tr>
         ))}
       </tbody>
