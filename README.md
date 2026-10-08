@@ -2,6 +2,8 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-EmreYK1%2FDocManager-181717?logo=github)](https://github.com/EmreYK1/DocManager)
 
+> 👆 Auf das Badge klicken, um zum GitHub-Repository zu gelangen.
+
 Dokumentenverwaltung mit Ordnerstruktur, Status und Kommentaren
 
 Eine webbasierte Anwendung zum Verwalten von Dokumenten. Dokumente werden in beliebig verschachtelten Ordnern abgelegt, mit Metadaten und einem Bearbeitungsstatus versehen und können kommentiert werden. Das Backend stellt eine REST-API mit PostgreSQL bereit, die Weboberfläche ist eine React-Anwendung.
