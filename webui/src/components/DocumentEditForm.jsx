@@ -1,23 +1,23 @@
 import { useState } from 'react'
-import { requireText } from '../validation/validators.js'
+import FolderSelect from './FolderSelect.jsx'
+import TextField from './TextField.jsx'
 import { DOCUMENT_STATUSES } from '../constants/documentStatus.js'
+import { useTextField } from '../hooks/useTextField.js'
 
-export default function DocumentEditForm({ document, folders = [], onSave }) {
+export default function DocumentEditForm({ document, folders = [], onSave, onCancel }) {
   const initialFolderId = document.folderId ?? ''
 
-  const [filename, setFilename] = useState(document.filename)
+  const filename = useTextField('Dateiname', document.filename)
   const [status, setStatus] = useState(document.status)
   const [folderId, setFolderId] = useState(initialFolderId)
-  const [filenameTouched, setFilenameTouched] = useState(false)
-  const filenameError = requireText(filename, 'Dateiname')
 
   function handleSubmit(event) {
     event.preventDefault()
-    if (filenameError) return
+    if (filename.error) return
 
     const changes = {}
-    if (filename.trim() !== document.filename) {
-      changes.filename = filename.trim()
+    if (filename.value.trim() !== document.filename) {
+      changes.filename = filename.value.trim()
     }
     if (status !== document.status) {
       changes.status = status
@@ -34,19 +34,9 @@ export default function DocumentEditForm({ document, folders = [], onSave }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
-        Dateiname
-        <input
-          value={filename}
-          onChange={(event) => {
-            setFilename(event.target.value)
-            setFilenameTouched(true)
-          }}
-        />
-      </label>
-      {filenameTouched && filenameError && <p role="alert">{filenameError}</p>}
-      <label>
+    <form onSubmit={handleSubmit} className="form">
+      <TextField label="Dateiname" field={filename} />
+      <label className="field">
         Status
         <select value={status} onChange={(event) => setStatus(event.target.value)}>
           {DOCUMENT_STATUSES.map((value) => (
@@ -56,18 +46,23 @@ export default function DocumentEditForm({ document, folders = [], onSave }) {
           ))}
         </select>
       </label>
-      <label>
-        Ordner
-        <select value={folderId} onChange={(event) => setFolderId(event.target.value)}>
-          <option value="">– kein Ordner –</option>
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="submit" disabled={Boolean(filenameError)}>Speichern</button>
+      <FolderSelect
+        label="Ordner"
+        value={folderId}
+        onChange={setFolderId}
+        folders={folders}
+        emptyLabel="– kein Ordner –"
+      />
+      <div className="form-actions">
+        {onCancel && (
+          <button type="button" className="btn" onClick={onCancel}>
+            Abbrechen
+          </button>
+        )}
+        <button type="submit" className="btn btn-primary" disabled={Boolean(filename.error)}>
+          Speichern
+        </button>
+      </div>
     </form>
   )
 }

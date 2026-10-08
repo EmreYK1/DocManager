@@ -1,6 +1,5 @@
 package com.docmanager.document.dto;
 
-import com.docmanager.document.entity.DocumentStatus;
 import lombok.Data;
 import java.util.UUID;
 
@@ -10,6 +9,4 @@ public class DocumentRequest {
     private String contentType;
     private long sizeBytes;
     private UUID folderId;
-    private DocumentStatus status;
-    private boolean clearFolder;
 }

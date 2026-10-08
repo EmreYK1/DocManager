@@ -1,0 +1,21 @@
+/* Metadaten */
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1.1rem 1.5rem;
+  margin: 0;
+}
+
+.meta dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.meta dd {
+  margin: 0;
+  font-weight: 500;
+  word-break: break-word;
+}

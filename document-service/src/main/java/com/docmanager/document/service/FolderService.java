@@ -7,13 +7,13 @@ import java.util.UUID;
 
 public interface FolderService {
 
-    Folder save(Folder folder);
+    Folder create(String name, UUID parentId);
 
     Folder findById(UUID id);
 
     List<Folder> findAll();
 
-    Folder update(UUID id, Folder updated);
+    Folder update(UUID id, String name, UUID parentId);
 
     void delete(UUID id);
 

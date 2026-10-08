@@ -53,17 +53,40 @@ class FolderServiceTest {
         idField.set(folder, id);
     }
 
-    // ─── save ────────────────────────────────────────────────────────────────
+    // ─── create ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("save() persistiert einen Ordner und gibt ihn zurück")
-    void save_delegatesToRepository() {
-        when(folderRepository.save(rootFolder)).thenReturn(rootFolder);
+    @DisplayName("create() persistiert einen Ordner ohne Parent")
+    void create_withoutParent_savesRootFolder() {
+        when(folderRepository.save(any(Folder.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Folder result = folderService.save(rootFolder);
+        Folder result = folderService.create("Root", null);
 
-        assertThat(result).isEqualTo(rootFolder);
-        verify(folderRepository, times(1)).save(rootFolder);
+        assertThat(result.getName()).isEqualTo("Root");
+        assertThat(result.getParent()).isNull();
+    }
+
+    @Test
+    @DisplayName("create() löst die Parent-ID auf und hängt den Ordner darunter")
+    void create_withParent_resolvesParent() {
+        when(folderRepository.findById(rootId)).thenReturn(Optional.of(rootFolder));
+        when(folderRepository.save(any(Folder.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Folder result = folderService.create("Child", rootId);
+
+        assertThat(result.getParent()).isEqualTo(rootFolder);
+    }
+
+    @Test
+    @DisplayName("create() wirft NotFoundException wenn der Parent nicht existiert")
+    void create_throwsNotFoundException_whenParentNotFound() {
+        UUID unknownId = UUID.randomUUID();
+        when(folderRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> folderService.create("Child", unknownId))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(folderRepository, never()).save(any());
     }
 
     // ─── findById ────────────────────────────────────────────────────────────
@@ -106,13 +129,14 @@ class FolderServiceTest {
     @Test
     @DisplayName("update() ändert Name und Parent und speichert")
     void update_updatesNameAndParent() {
+        UUID anotherParentId = UUID.randomUUID();
         Folder anotherParent = new Folder("AnotherParent", null);
-        Folder updated = new Folder("Renamed", anotherParent);
 
         when(folderRepository.findById(childId)).thenReturn(Optional.of(childFolder));
+        when(folderRepository.findById(anotherParentId)).thenReturn(Optional.of(anotherParent));
         when(folderRepository.save(any(Folder.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Folder result = folderService.update(childId, updated);
+        Folder result = folderService.update(childId, "Renamed", anotherParentId);
 
         assertThat(result.getName()).isEqualTo("Renamed");
         assertThat(result.getParent()).isEqualTo(anotherParent);
@@ -125,7 +149,7 @@ class FolderServiceTest {
         UUID unknownId = UUID.randomUUID();
         when(folderRepository.findById(unknownId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> folderService.update(unknownId, rootFolder))
+        assertThatThrownBy(() -> folderService.update(unknownId, "Name", null))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Folder not found");
 

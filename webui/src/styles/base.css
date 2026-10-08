@@ -1,0 +1,66 @@
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --border: #e3e7f0;
+  --text: #1c2333;
+  --muted: #6b7489;
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --primary-soft: #eef0ff;
+  --danger: #dc2626;
+  --danger-soft: #fef0f0;
+  --ok: #16a34a;
+  --ok-soft: #e8f8ee;
+  --warn: #b45309;
+  --warn-soft: #fff4e0;
+  --info: #2563eb;
+  --info-soft: #e8f0ff;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(20, 30, 60, 0.05), 0 4px 16px rgba(20, 30, 60, 0.06);
+  font-family: Inter, 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.85rem;
+}

@@ -1,6 +1,7 @@
 package com.docmanager.document.controller;
 
 import com.docmanager.document.dto.DocumentRequest;
+import com.docmanager.document.dto.DocumentUpdateRequest;
 import com.docmanager.document.dto.DocumentResponse;
 import com.docmanager.document.mapper.DocumentMapper;
 import com.docmanager.document.entity.Document;
@@ -39,7 +40,7 @@ public class DocumentController {
     }
 
     @PatchMapping("/{id}")
-    public DocumentResponse update(@PathVariable UUID id, @RequestBody DocumentRequest request) {
+    public DocumentResponse update(@PathVariable UUID id, @RequestBody DocumentUpdateRequest request) {
         DocumentUpdate update = new DocumentUpdate(request.getFilename(), request.getStatus(), request.getFolderId(), request.isClearFolder());
         return DocumentMapper.toResponse(documentService.update(id, update));
     }

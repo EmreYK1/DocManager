@@ -19,8 +19,8 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
-    public Folder save(Folder folder) {
-        return folderRepository.save(folder);
+    public Folder create(String name, UUID parentId) {
+        return folderRepository.save(new Folder(name, findParent(parentId)));
     }
 
     @Override
@@ -35,10 +35,10 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
-    public Folder update(UUID id, Folder updated) {
+    public Folder update(UUID id, String name, UUID parentId) {
         Folder existing = findById(id);
-        existing.setName(updated.getName());
-        existing.setParent(updated.getParent());
+        existing.setName(name);
+        existing.setParent(findParent(parentId));
         return folderRepository.save(existing);
     }
 
@@ -56,5 +56,9 @@ public class FolderServiceImpl implements FolderService {
     public List<Folder> findChildren(UUID parentId) {
         Folder parent = findById(parentId);
         return folderRepository.findByParent(parent);
+    }
+
+    private Folder findParent(UUID parentId) {
+        return parentId != null ? findById(parentId) : null;
     }
 }

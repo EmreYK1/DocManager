@@ -2,7 +2,6 @@ package com.docmanager.document.controller;
 
 import com.docmanager.document.dto.FolderRequest;
 import com.docmanager.document.dto.FolderResponse;
-import com.docmanager.document.entity.Folder;
 import com.docmanager.document.mapper.FolderMapper;
 import com.docmanager.document.service.FolderService;
 import org.springframework.web.bind.annotation.*;
@@ -21,10 +20,7 @@ public class FolderController {
 
     @PostMapping
     public FolderResponse create(@RequestBody FolderRequest request) {
-        Folder parent = request.getParentId() != null
-                ? folderService.findById(request.getParentId())
-                : null;
-        return FolderMapper.toResponse(folderService.save(new Folder(request.getName(), parent)));
+        return FolderMapper.toResponse(folderService.create(request.getName(), request.getParentId()));
     }
 
     @GetMapping("/{id}")
@@ -48,10 +44,7 @@ public class FolderController {
 
     @PutMapping("/{id}")
     public FolderResponse update(@PathVariable UUID id, @RequestBody FolderRequest request) {
-        Folder parent = request.getParentId() != null
-                ? folderService.findById(request.getParentId())
-                : null;
-        return FolderMapper.toResponse(folderService.update(id, new Folder(request.getName(), parent)));
+        return FolderMapper.toResponse(folderService.update(id, request.getName(), request.getParentId()));
     }
 
     @DeleteMapping("/{id}")

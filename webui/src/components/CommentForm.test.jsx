@@ -10,8 +10,8 @@ describe('CommentForm', () => {
       
         render(<CommentForm onSubmit={onSubmit} />)
       
-        fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Max' } })
-        fireEvent.change(screen.getByLabelText('Content'), { target: { value: 'Toller Kommentar' } })
+        fireEvent.change(screen.getByLabelText('Autor'), { target: { value: 'Max' } })
+        fireEvent.change(screen.getByLabelText('Kommentar'), { target: { value: 'Toller Kommentar' } })
         fireEvent.click(screen.getByRole('button', { name: 'Kommentar senden' }))
       
         expect(onSubmit).toHaveBeenCalledWith({ author: 'Max', content: 'Toller Kommentar' })
@@ -24,8 +24,8 @@ describe('CommentForm Validierung', () => {
         const onSubmit = vi.fn().mockResolvedValue()
         render(<CommentForm onSubmit={onSubmit} />)
 
-        fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Max' } })
-        fireEvent.change(screen.getByLabelText('Content'), { target: { value: '   ' } })
+        fireEvent.change(screen.getByLabelText('Autor'), { target: { value: 'Max' } })
+        fireEvent.change(screen.getByLabelText('Kommentar'), { target: { value: '   ' } })
         const button = screen.getByRole('button', { name: 'Kommentar senden' })
         fireEvent.click(button)
 

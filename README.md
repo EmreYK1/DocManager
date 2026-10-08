@@ -49,16 +49,26 @@ mvn test
 | POST    | `/documents`      | Dokument anlegen          |
 | GET     | `/documents`      | Alle Dokumente abrufen    |
 | GET     | `/documents/{id}` | Einzelnes Dokument abrufen|
-| PUT     | `/documents/{id}` | Dokument aktualisieren    |
-| DELETE  | `/documents/{id}` | Dokument löschen          |
+| PATCH   | `/documents/{id}` | Dokument teilweise ändern |
+| DELETE  | `/documents/{id}` | Dokument samt Kommentaren löschen |
 
-**POST / PUT Body:**
+**POST Body:**
 ```json
 {
   "filename": "bericht.pdf",
   "contentType": "application/pdf",
   "sizeBytes": 2048,
   "folderId": "uuid-des-ordners"
+}
+```
+
+**PATCH Body** (alle Felder optional; `clearFolder: true` entfernt die Ordner-Zuordnung):
+```json
+{
+  "filename": "neu.pdf",
+  "status": "OCR_DONE",
+  "folderId": "uuid-des-ordners",
+  "clearFolder": false
 }
 ```
 
@@ -82,6 +92,8 @@ mvn test
 ```
 
 `parentId` ist optional – fehlt es, wird ein Root-Ordner angelegt.
+
+Ordner mit Unterordnern oder Dokumenten können nicht gelöscht werden (Antwort `409 Conflict`).
 
 ## Projektstruktur
 

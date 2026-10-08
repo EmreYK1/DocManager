@@ -1,52 +1,31 @@
-import { useState } from 'react';
-import { requireText } from '../validation/validators.js';
+import TextField from './TextField.jsx'
+import { useTextField } from '../hooks/useTextField.js'
+import { resetAfterSubmit } from '../utils/afterSubmit.js'
 
 export default function CommentForm({ onSubmit }) {
-    const [author, setAuthor] = useState('')
-    const [content, setContent] = useState('')
-    const [authorTouched, setAuthorTouched] = useState(false)
-    const [contentTouched, setContentTouched] = useState(false)
-    const authorError = requireText(author, 'Autor')
-    const contentError = requireText(content, 'Inhalt')
+  const author = useTextField('Autor')
+  const content = useTextField('Kommentar')
+  const hasError = Boolean(author.error || content.error)
 
-    function handleSubmit(event) {
-        event.preventDefault()
-        if (authorError || contentError) return
-        onSubmit({ author: author.trim(), content: content.trim() })
-            .then(() => {
-                setAuthor('')
-                setContent('')
-                setAuthorTouched(false)
-                setContentTouched(false)
-            })
-            .catch(() => {})
-    }
-    return (
-        <form onSubmit={handleSubmit}>
-            <label>
-                Author
-                <input
-                    value={author}
-                    onChange={(event) => {
-                        setAuthor(event.target.value)
-                        setAuthorTouched(true)
-                    }}
-                />
-            </label>
-            {authorTouched && authorError && <p role="alert">{authorError}</p>}
-                <label>
-                Content
-                <input
-                    value={content}
-                    onChange={(event) => {
-                        setContent(event.target.value)
-                        setContentTouched(true)
-                    }}
-                />
-            </label>
-            {contentTouched && contentError && <p role="alert">{contentError}</p>}
-            <button type="submit" disabled={Boolean(authorError || contentError)}>Kommentar senden</button>
-        </form> 
-    )
+  function handleSubmit(event) {
+    event.preventDefault()
+    if (hasError) return
+    const result = onSubmit({ author: author.value.trim(), content: content.value.trim() })
+    resetAfterSubmit(result, () => {
+      author.reset()
+      content.reset()
+    })
+  }
 
+  return (
+    <form onSubmit={handleSubmit} className="form">
+      <TextField label="Autor" field={author} />
+      <TextField label="Kommentar" field={content} multiline />
+      <div className="form-actions">
+        <button type="submit" className="btn btn-primary" disabled={hasError}>
+          Kommentar senden
+        </button>
+      </div>
+    </form>
+  )
 }

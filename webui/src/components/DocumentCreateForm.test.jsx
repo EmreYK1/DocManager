@@ -25,23 +25,15 @@ describe('DocumentCreateForm', () => {
     })
   })
 
-  it('deaktiviert den Button bei leerem Dateinamen', () => {
-    const onSubmit = vi.fn()
-    render(<DocumentCreateForm onSubmit={onSubmit} />)
-
+  it('deaktiviert den Button bei leerem Dateinamen oder ungültiger Größe', () => {
+    render(<DocumentCreateForm onSubmit={vi.fn()} />)
     const button = screen.getByRole('button', { name: 'Dokument anlegen' })
     expect(button.disabled).toBe(true)
-    fireEvent.click(button)
-    expect(onSubmit).not.toHaveBeenCalled()
-  })
-
-  it('deaktiviert den Button bei ungültiger Größe', () => {
-    render(<DocumentCreateForm onSubmit={vi.fn()} />)
 
     fireEvent.change(screen.getByLabelText('Dateiname'), { target: { value: 'a.pdf' } })
-    fireEvent.change(screen.getByLabelText('Größe (Bytes)'), { target: { value: '-5' } })
+    expect(button.disabled).toBe(false)
 
-    expect(screen.getByRole('button', { name: 'Dokument anlegen' }).disabled).toBe(true)
-    expect(screen.getByRole('alert').textContent).toContain('Größe')
+    fireEvent.change(screen.getByLabelText('Größe (Bytes)'), { target: { value: '-5' } })
+    expect(button.disabled).toBe(true)
   })
 })

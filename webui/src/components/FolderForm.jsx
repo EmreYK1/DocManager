@@ -1,46 +1,51 @@
 import { useState } from 'react'
-import { requireText } from '../validation/validators.js'
+import FolderSelect from './FolderSelect.jsx'
+import TextField from './TextField.jsx'
+import { useTextField } from '../hooks/useTextField.js'
+import { resetAfterSubmit } from '../utils/afterSubmit.js'
 
-export default function FolderForm({ folders = [], onSubmit }) {
-  const [name, setName] = useState('')
-  const [parentId, setParentId] = useState('')
-  const [touched, setTouched] = useState(false)
-  const nameError = requireText(name, 'Ordnername')
+export default function FolderForm({
+  folders = [],
+  onSubmit,
+  initial = { name: '', parentId: '' },
+  excludeIds,
+  submitLabel = 'Ordner anlegen',
+  onCancel,
+}) {
+  const name = useTextField('Ordnername', initial.name)
+  const [parentId, setParentId] = useState(initial.parentId ?? '')
 
   function handleSubmit(event) {
     event.preventDefault()
-    if (nameError) return
-    onSubmit({ name: name.trim(), parentId: parentId || null })
-    setName('')
-    setParentId('')
-    setTouched(false)
+    if (name.error) return
+    const result = onSubmit({ name: name.value.trim(), parentId: parentId || null })
+    resetAfterSubmit(result, () => {
+      name.reset()
+      setParentId(initial.parentId ?? '')
+    })
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
-        Name
-        <input
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value)
-            setTouched(true)
-          }}
-        />
-      </label>
-      {touched && nameError && <p role="alert">{nameError}</p>}
-      <label>
-        Elternordner
-        <select value={parentId} onChange={(event) => setParentId(event.target.value)}>
-          <option value="">– kein Elternordner –</option>
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="submit" disabled={Boolean(nameError)}>Ordner anlegen</button>
+    <form onSubmit={handleSubmit} className="form">
+      <TextField label="Name" field={name} autoFocus />
+      <FolderSelect
+        label="Elternordner"
+        value={parentId}
+        onChange={setParentId}
+        folders={folders}
+        excludeIds={excludeIds}
+        emptyLabel="– kein Elternordner –"
+      />
+      <div className="form-actions">
+        {onCancel && (
+          <button type="button" className="btn" onClick={onCancel}>
+            Abbrechen
+          </button>
+        )}
+        <button type="submit" className="btn btn-primary" disabled={Boolean(name.error)}>
+          {submitLabel}
+        </button>
+      </div>
     </form>
   )
 }

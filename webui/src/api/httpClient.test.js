@@ -26,6 +26,12 @@ describe('request', () => {
     await expect(request('/documents/1', { method: 'DELETE' })).resolves.toBeNull()
   })
 
+  it('liefert null bei leerem Body mit Status 200', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }))
+
+    await expect(request('/documents/1', { method: 'DELETE' })).resolves.toBeNull()
+  })
+
   it('wirft ApiError mit Status 500 bei einem Serverfehler', async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ status: 500, message: 'Boom' }), { status: 500 }),

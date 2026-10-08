@@ -1,0 +1,70 @@
+/* Karten & Tabelle */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-padded {
+  padding: 1.25rem 1.5rem;
+}
+
+.card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.search {
+  flex: 1;
+  max-width: 380px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 0.7rem 1.1rem;
+  background: #fafbfe;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:hover {
+  background: #fafbff;
+}
+
+.doc-link {
+  font-weight: 600;
+}
+
+.empty {
+  margin: 0;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--muted);
+}

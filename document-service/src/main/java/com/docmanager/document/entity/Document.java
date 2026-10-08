@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -46,6 +48,10 @@ public class Document {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "folder_id")
     private Folder folder;
+
+    // Kommentare werden mit dem Dokument gelöscht
+    @OneToMany(mappedBy = "document", cascade = CascadeType.REMOVE)
+    private List<Comment> comments = new ArrayList<>();
 
     public Document(String filename, String contentType, long sizeBytes, Folder folder) {
         this.filename = filename;
