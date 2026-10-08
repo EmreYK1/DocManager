@@ -66,3 +66,20 @@ describe('DocumentEditForm', () => {
     expect(onSave).toHaveBeenCalledWith({})
   })
 })
+
+describe('DocumentEditForm Validierung', () => {
+  afterEach(cleanup)
+
+  it('deaktiviert Speichern bei leerem Dateinamen', () => {
+    const onSave = vi.fn()
+    render(<DocumentEditForm document={document} folders={folders} onSave={onSave} />)
+
+    fireEvent.change(screen.getByLabelText('Dateiname'), { target: { value: ' ' } })
+    const button = screen.getByRole('button', { name: 'Speichern' })
+    fireEvent.click(button)
+
+    expect(button.disabled).toBe(true)
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+})

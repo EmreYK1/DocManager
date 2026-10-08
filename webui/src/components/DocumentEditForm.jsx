@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { requireText } from '../validation/validators.js'
 import { DOCUMENT_STATUSES } from '../constants/documentStatus.js'
 
 export default function DocumentEditForm({ document, folders = [], onSave }) {
@@ -7,13 +8,16 @@ export default function DocumentEditForm({ document, folders = [], onSave }) {
   const [filename, setFilename] = useState(document.filename)
   const [status, setStatus] = useState(document.status)
   const [folderId, setFolderId] = useState(initialFolderId)
+  const [filenameTouched, setFilenameTouched] = useState(false)
+  const filenameError = requireText(filename, 'Dateiname')
 
   function handleSubmit(event) {
     event.preventDefault()
+    if (filenameError) return
 
     const changes = {}
-    if (filename !== document.filename) {
-      changes.filename = filename
+    if (filename.trim() !== document.filename) {
+      changes.filename = filename.trim()
     }
     if (status !== document.status) {
       changes.status = status
@@ -33,8 +37,15 @@ export default function DocumentEditForm({ document, folders = [], onSave }) {
     <form onSubmit={handleSubmit}>
       <label>
         Dateiname
-        <input value={filename} onChange={(event) => setFilename(event.target.value)} />
+        <input
+          value={filename}
+          onChange={(event) => {
+            setFilename(event.target.value)
+            setFilenameTouched(true)
+          }}
+        />
       </label>
+      {filenameTouched && filenameError && <p role="alert">{filenameError}</p>}
       <label>
         Status
         <select value={status} onChange={(event) => setStatus(event.target.value)}>
@@ -56,7 +67,7 @@ export default function DocumentEditForm({ document, folders = [], onSave }) {
           ))}
         </select>
       </label>
-      <button type="submit">Speichern</button>
+      <button type="submit" disabled={Boolean(filenameError)}>Speichern</button>
     </form>
   )
 }

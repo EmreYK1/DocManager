@@ -17,3 +17,19 @@ describe('CommentForm', () => {
         expect(onSubmit).toHaveBeenCalledWith({ author: 'Max', content: 'Toller Kommentar' })
       })
     });
+describe('CommentForm Validierung', () => {
+    afterEach(cleanup)
+
+    it('sendet keinen Kommentar, der nur aus Leerzeichen besteht', () => {
+        const onSubmit = vi.fn().mockResolvedValue()
+        render(<CommentForm onSubmit={onSubmit} />)
+
+        fireEvent.change(screen.getByLabelText('Author'), { target: { value: 'Max' } })
+        fireEvent.change(screen.getByLabelText('Content'), { target: { value: '   ' } })
+        const button = screen.getByRole('button', { name: 'Kommentar senden' })
+        fireEvent.click(button)
+
+        expect(button.disabled).toBe(true)
+        expect(onSubmit).not.toHaveBeenCalled()
+    })
+})

@@ -58,3 +58,22 @@ describe('FolderForm', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('FolderForm Validierung', () => {
+  afterEach(cleanup)
+
+  it('deaktiviert den Button bei leerem Namen und sendet nichts', () => {
+    const onSubmit = vi.fn()
+    render(<FolderForm folders={folders} onSubmit={onSubmit} />)
+
+    const button = screen.getByRole('button', { name: 'Ordner anlegen' })
+    expect(button.disabled).toBe(true)
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '   ' } })
+    expect(button.disabled).toBe(true)
+    expect(screen.getByRole('alert').textContent).toBe('Ordnername darf nicht leer sein.')
+
+    fireEvent.click(button)
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+})
