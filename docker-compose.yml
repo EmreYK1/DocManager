@@ -25,6 +25,10 @@ services:
       DB_URL: jdbc:postgresql://db:5432/docmanager
       DB_USER: docmanager
       DB_PASSWORD: docmanager
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
     ports:
       - "8080:8080"
     depends_on:
