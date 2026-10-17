@@ -30,6 +30,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   webui:
     build:
@@ -40,5 +42,24 @@ services:
     depends_on:
       - document-service
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: docmanager-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
 volumes:
   db-data:
+  rabbitmq-data:
