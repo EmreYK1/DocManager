@@ -6,6 +6,7 @@ import com.docmanager.document.dto.DocumentResponse;
 import com.docmanager.document.mapper.DocumentMapper;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.service.DocumentService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 import com.docmanager.document.service.DocumentUpdate;
 
@@ -22,7 +23,7 @@ public class DocumentController {
     }
 
     @PostMapping
-    public DocumentResponse create(@RequestBody DocumentRequest request) {
+    public DocumentResponse create(@Valid @RequestBody DocumentRequest request) {
         Document document = documentService.create(request.getFilename(), request.getContentType(), request.getSizeBytes(), request.getFolderId());
         return DocumentMapper.toResponse(document);
     }
@@ -40,7 +41,7 @@ public class DocumentController {
     }
 
     @PatchMapping("/{id}")
-    public DocumentResponse update(@PathVariable UUID id, @RequestBody DocumentUpdateRequest request) {
+    public DocumentResponse update(@PathVariable UUID id, @Valid @RequestBody DocumentUpdateRequest request) {
         DocumentUpdate update = new DocumentUpdate(request.getFilename(), request.getStatus(), request.getFolderId(), request.isClearFolder());
         return DocumentMapper.toResponse(documentService.update(id, update));
     }
