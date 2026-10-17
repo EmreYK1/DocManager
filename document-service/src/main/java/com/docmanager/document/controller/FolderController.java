@@ -4,6 +4,7 @@ import com.docmanager.document.dto.FolderRequest;
 import com.docmanager.document.dto.FolderResponse;
 import com.docmanager.document.mapper.FolderMapper;
 import com.docmanager.document.service.FolderService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,7 +20,7 @@ public class FolderController {
     }
 
     @PostMapping
-    public FolderResponse create(@RequestBody FolderRequest request) {
+    public FolderResponse create(@Valid @RequestBody FolderRequest request) {
         return FolderMapper.toResponse(folderService.create(request.getName(), request.getParentId()));
     }
 
@@ -43,7 +44,7 @@ public class FolderController {
     }
 
     @PutMapping("/{id}")
-    public FolderResponse update(@PathVariable UUID id, @RequestBody FolderRequest request) {
+    public FolderResponse update(@PathVariable UUID id, @Valid @RequestBody FolderRequest request) {
         return FolderMapper.toResponse(folderService.update(id, request.getName(), request.getParentId()));
     }
 

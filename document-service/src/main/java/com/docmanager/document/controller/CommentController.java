@@ -5,6 +5,7 @@ import com.docmanager.document.dto.CommentResponse;
 import com.docmanager.document.mapper.CommentMapper;
 import com.docmanager.document.service.CommentService;
 import org.springframework.http.HttpStatus;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,7 +25,7 @@ public class CommentController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CommentResponse create(@PathVariable UUID documentId,
-                                  @RequestBody CommentRequest request) {
+                                  @Valid @RequestBody CommentRequest request) {
         return CommentMapper.toResponse(
                 commentService.save(documentId, request.getContent(), request.getAuthor()));
     }
@@ -48,7 +49,7 @@ public class CommentController {
     @PutMapping("/{id}")
     public CommentResponse update(@PathVariable UUID documentId,
                                   @PathVariable UUID id,
-                                  @RequestBody CommentRequest request) {
+                                  @Valid @RequestBody CommentRequest request) {
         return CommentMapper.toResponse(commentService.update(id, request.getContent()));
     }
 
