@@ -47,6 +47,19 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("eigene MessagingException -> 500 mit generischer Meldung")
+    void customMessagingException_returns500() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleMessaging(
+                        new MessagingException("Nachricht konnte nicht gesendet werden",
+                                new AmqpConnectException(new RuntimeException("geheim"))));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody().message())
+                .isEqualTo("Messaging-Fehler: Nachricht konnte nicht gesendet werden");
+    }
+
+    @Test
     @DisplayName("Unbehandelte Exception -> 500 ohne interne Details")
     void unexpectedError_returns500() {
         ResponseEntity<ErrorResponse> response =
