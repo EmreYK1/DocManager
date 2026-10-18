@@ -7,6 +7,7 @@ import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.impl.DocumentServiceImpl;
 import com.docmanager.document.service.DocumentUpdate;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,9 @@ class DocumentServiceTest {
     @Mock
     private FolderService folderService;
 
+    @Mock
+    private RabbitTemplate rabbitTemplate;
+
     @InjectMocks
     private DocumentServiceImpl documentService;
 
@@ -55,15 +59,20 @@ class DocumentServiceTest {
     // ─── create ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("create() erstellt Dokument mit UPLOADED Status ohne Folder wenn folderId null")
+    @DisplayName("create() erstellt Dokument mit OCR_PENDING Status ohne Folder wenn folderId null und sendet Nachricht")
     void create_withoutFolder_createsDocument() {
-        when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(documentRepository.save(any())).thenAnswer(inv -> {
+            Document d = inv.getArgument(0);
+            d.setId(sampleId);
+            return d;
+        });
 
         Document result = documentService.create("neu.pdf", "application/pdf", 512L, null);
 
         assertThat(result.getFilename()).isEqualTo("neu.pdf");
-        assertThat(result.getStatus()).isEqualTo(DocumentStatus.UPLOADED);
+        assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_PENDING);
         verify(documentRepository).save(any());
+        verify(rabbitTemplate).convertAndSend(any(), any(), eq(sampleId.toString()));
     }
 
     // ─── findById ────────────────────────────────────────────────────────────
@@ -144,7 +153,7 @@ class DocumentServiceTest {
         Document result = documentService.update(sampleId, update);
 
         assertThat(result.getFilename()).isEqualTo("neu.pdf");
-        assertThat(result.getStatus()).isEqualTo(DocumentStatus.UPLOADED);
+        assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_PENDING);
     }
 
     @Test

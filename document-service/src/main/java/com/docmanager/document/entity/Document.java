@@ -59,6 +59,6 @@ public class Document {
         this.sizeBytes = sizeBytes;
         this.folder = folder;
         this.uploadedAt = Instant.now();
-        this.status = DocumentStatus.UPLOADED;
+        this.status = DocumentStatus.OCR_PENDING;
     }
 }

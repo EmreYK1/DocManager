@@ -5,6 +5,8 @@ import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.DocumentService;
 import com.docmanager.document.service.DocumentUpdate;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.docmanager.document.service.FolderService;
 import com.docmanager.document.entity.Folder;
@@ -16,10 +18,20 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
     private final FolderService folderService;
-    
-    public DocumentServiceImpl(DocumentRepository documentRepository, FolderService folderService) {
+    private final RabbitTemplate rabbitTemplate;
+    private final String exchange;
+    private final String documentRoutingKey;
+
+    public DocumentServiceImpl(DocumentRepository documentRepository,
+                               FolderService folderService,
+                               RabbitTemplate rabbitTemplate,
+                               @Value("${app.rabbitmq.exchange}") String exchange,
+                               @Value("${app.rabbitmq.routing-key.document}") String documentRoutingKey) {
         this.documentRepository = documentRepository;
         this.folderService = folderService;
+        this.rabbitTemplate = rabbitTemplate;
+        this.exchange = exchange;
+        this.documentRoutingKey = documentRoutingKey;
     }
 
     @Override
@@ -27,8 +39,9 @@ public class DocumentServiceImpl implements DocumentService {
         Folder folder = folderId != null
                 ? folderService.findById(folderId)
                 : null;
-                Document doc = new Document(filename, contentType, sizeBytes, folder);
-                return documentRepository.save(doc);
+        Document doc = documentRepository.save(new Document(filename, contentType, sizeBytes, folder));
+        rabbitTemplate.convertAndSend(exchange, documentRoutingKey, doc.getId().toString());
+        return doc;
     }
 
     @Override

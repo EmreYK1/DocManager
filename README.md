@@ -117,7 +117,7 @@ DocManager/
 
 **Fehler.** Unbekannte IDs liefern `404`. Wird eine Ressource noch verwendet, zum Beispiel ein Ordner mit Inhalt, antwortet das Backend mit `409`. Fehler haben die Form `{"status": 404, "message": "..."}` und werden in der Oberfläche als deutsche Meldung angezeigt.
 
-**Dokumentstatus.** Ein neues Dokument beginnt mit `UPLOADED`. Weitere Werte sind `OCR_PENDING`, `OCR_DONE`, `SUMMARY_DONE` und `FAILED`. Aktuell setzt man den Status von Hand auf der Detailseite.
+**Dokumentstatus.** Ein neues Dokument beginnt mit `OCR_PENDING` und löst eine Nachricht in der OCR-Queue aus. Weitere Werte sind `UPLOADED`, `OCR_DONE`, `SUMMARY_DONE` und `FAILED`. Aktuell setzt man den Status von Hand auf der Detailseite.
 
 **Eingabeprüfung.** Die Regeln liegen als reine Funktionen in `webui/src/validation` und werden von allen Formularen genutzt. Pflichtfelder dürfen nicht leer sein, auch nicht nur aus Leerzeichen bestehen. Die Größe eines Dokuments muss eine ganze Zahl ab 0 sein. Solange ein Fehler besteht, ist der Absenden-Button deaktiviert und es wird kein Request geschickt.
 
