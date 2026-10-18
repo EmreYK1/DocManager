@@ -6,6 +6,8 @@ import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.DocumentService;
 import com.docmanager.document.service.DocumentUpdate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.AmqpException;
+import com.docmanager.document.exception.MessagingException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.docmanager.document.service.FolderService;
@@ -40,7 +42,11 @@ public class DocumentServiceImpl implements DocumentService {
                 ? folderService.findById(folderId)
                 : null;
         Document doc = documentRepository.save(new Document(filename, contentType, sizeBytes, folder));
-        rabbitTemplate.convertAndSend(exchange, documentRoutingKey, doc.getId().toString());
+        try {
+            rabbitTemplate.convertAndSend(exchange, documentRoutingKey, doc.getId().toString());
+        } catch (AmqpException e) {
+            throw new MessagingException("Nachricht konnte nicht gesendet werden", e);
+        }
         return doc;
     }
 
