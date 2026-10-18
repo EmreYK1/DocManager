@@ -8,6 +8,7 @@ import com.docmanager.document.service.DocumentUpdate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.AmqpException;
 import com.docmanager.document.exception.MessagingException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.docmanager.document.service.FolderService;
@@ -15,6 +16,7 @@ import com.docmanager.document.entity.Folder;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class DocumentServiceImpl implements DocumentService {
 
@@ -42,9 +44,12 @@ public class DocumentServiceImpl implements DocumentService {
                 ? folderService.findById(folderId)
                 : null;
         Document doc = documentRepository.save(new Document(filename, contentType, sizeBytes, folder));
+        log.info("Dokument erstellt: id={}, filename={}", doc.getId(), doc.getFilename());
         try {
             rabbitTemplate.convertAndSend(exchange, documentRoutingKey, doc.getId().toString());
+            log.info("OCR-Nachricht gesendet für Dokument-ID: {}", doc.getId());
         } catch (AmqpException e) {
+            log.error("Fehler beim Senden der OCR-Nachricht für Dokument-ID: {}", doc.getId(), e);
             throw new MessagingException("Nachricht konnte nicht gesendet werden", e);
         }
         return doc;
@@ -71,11 +76,14 @@ public class DocumentServiceImpl implements DocumentService {
         } else if (update.folderId() != null) {
             existing.setFolder(folderService.findById(update.folderId()));
         }
-        return documentRepository.save(existing);
+        existing = documentRepository.save(existing);
+        log.info("Dokument aktualisiert: id={}, neuer Status={}", id, existing.getStatus());
+        return existing;
     }
 
     @Override
     public void delete(UUID id) {
         documentRepository.deleteById(id);
+        log.info("Dokument gelöscht: id={}", id);
     }
 }

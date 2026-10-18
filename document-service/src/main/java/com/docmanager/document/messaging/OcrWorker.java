@@ -18,6 +18,7 @@ public class OcrWorker {
         try {
             log.info("OCR-Nachricht empfangen für Dokument-ID: {}", documentId);
         } catch (AmqpException e) {
+            log.error("Fehler beim Verarbeiten der OCR-Nachricht für Dokument-ID: {}", documentId, e);
             throw new MessagingException("OCR-Nachricht konnte nicht verarbeitet werden", e);
         }
     }
