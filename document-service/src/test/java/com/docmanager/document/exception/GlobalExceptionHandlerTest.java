@@ -1,75 +1,147 @@
 package com.docmanager.document.exception;
 
+import com.docmanager.document.controller.DocumentController;
 import com.docmanager.document.dto.ErrorResponse;
+import com.docmanager.document.service.DocumentService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.amqp.AmqpConnectException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BeanPropertyBindingResult;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@WebMvcTest(DocumentController.class)
+@Import(GlobalExceptionHandler.class)
 class GlobalExceptionHandlerTest {
 
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private DocumentService documentService;
 
     @Test
-    @DisplayName("Validation-Fehler -> 400 mit zusammengeführten Feldmeldungen")
-    void validationError_returns400() throws Exception {
-        var bindingResult = new BeanPropertyBindingResult(new Object(), "request");
-        bindingResult.addError(new FieldError("request", "filename", "darf nicht leer sein"));
-        bindingResult.addError(new FieldError("request", "sizeBytes", "muss positiv sein"));
-        var ex = new MethodArgumentNotValidException(
-                new org.springframework.core.MethodParameter(
-                        GlobalExceptionHandlerTest.class.getDeclaredMethod("dummy", String.class), 0),
-                bindingResult);
+    @DisplayName("NotFoundException → HTTP 404 mit status im Body")
+    void notFound_returns404() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentService.findById(id))
+                .thenThrow(new NotFoundException("Dokument nicht gefunden"));
 
-        ResponseEntity<ErrorResponse> response = handler.handleValidation(ex);
+        MvcResult result = mockMvc.perform(get("/documents/{id}", id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andReturn();
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().message())
-                .contains("filename: darf nicht leer sein", "sizeBytes: muss positiv sein");
-        assertThat(response.getBody().timestamp()).isNotNull();
+        assertValidErrorBody(result);
     }
 
     @Test
-    @DisplayName("Messaging-Fehler -> 500 mit generischer Meldung")
-    void messagingError_returns500() {
-        ResponseEntity<ErrorResponse> response =
-                handler.handleMessaging(new AmqpConnectException(new RuntimeException("geheim")));
+    @DisplayName("MethodArgumentNotValidException → HTTP 400")
+    void validation_returns400() throws Exception {
+        String invalidBody = """
+                {
+                  "filename": "",
+                  "contentType": "application/pdf",
+                  "sizeBytes": 100
+                }
+                """;
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody().message())
-                .isEqualTo("Messaging-Fehler: Nachricht konnte nicht gesendet werden");
+        MvcResult result = mockMvc.perform(post("/documents")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andReturn();
+
+        assertValidErrorBody(result);
     }
 
     @Test
-    @DisplayName("eigene MessagingException -> 500 mit generischer Meldung")
-    void customMessagingException_returns500() {
-        ResponseEntity<ErrorResponse> response =
-                handler.handleMessaging(
-                        new MessagingException("Nachricht konnte nicht gesendet werden",
-                                new AmqpConnectException(new RuntimeException("geheim"))));
+    @DisplayName("MessagingException → HTTP 500 ohne Stack-Trace")
+    void messaging_returns500() throws Exception {
+        when(documentService.create(anyString(), anyString(), anyLong(), nullable(UUID.class)))
+                .thenThrow(new MessagingException(
+                        "Nachricht konnte nicht gesendet werden", null));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody().message())
-                .isEqualTo("Messaging-Fehler: Nachricht konnte nicht gesendet werden");
+        String validBody = """
+                {
+                  "filename": "test.pdf",
+                  "contentType": "application/pdf",
+                  "sizeBytes": 100
+                }
+                """;
+
+        MvcResult result = mockMvc.perform(post("/documents")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validBody))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value(
+                        "Messaging-Fehler: Nachricht konnte nicht gesendet werden"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andReturn();
+
+        assertValidErrorBody(result);
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("at com.docmanager");
     }
 
     @Test
-    @DisplayName("Unbehandelte Exception -> 500 ohne interne Details")
-    void unexpectedError_returns500() {
-        ResponseEntity<ErrorResponse> response =
-                handler.handleUnexpected(new IllegalStateException("interne Details"));
+    @DisplayName("Unbehandelte Exception → HTTP 500 generische Meldung")
+    void unexpected_returns500() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentService.findById(id))
+                .thenThrow(new RuntimeException("geheime interne Details"));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody().message()).isEqualTo("Interner Serverfehler");
+        MvcResult result = mockMvc.perform(get("/documents/{id}", id))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value("Interner Serverfehler"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andReturn();
+
+        assertValidErrorBody(result);
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("geheime interne Details")
+                .doesNotContain("at com.docmanager");
     }
 
-    @SuppressWarnings("unused")
-    private void dummy(String arg) {
+    private void assertValidErrorBody(MvcResult result) throws Exception {
+        String body = result.getResponse().getContentAsString();
+        assertThat(body).doesNotContain("stackTrace");
+        assertThat(body).doesNotContain("\tat ");
+
+        ErrorResponse error = objectMapper.readValue(body, ErrorResponse.class);
+        assertThat(error.timestamp()).isNotNull();
+        // Round-trip: Instant → ISO-8601 String → Instant.parse muss gültig sein
+        Instant parsed = Instant.parse(error.timestamp().toString());
+        assertThat(parsed).isEqualTo(error.timestamp());
     }
 }
