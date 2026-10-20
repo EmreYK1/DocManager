@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,10 +38,12 @@ public class Document {
     @Column(nullable = false)
     private DocumentStatus status;
 
+    @ToString.Exclude
     @Lob
     @Column(name = "ocr_text")
     private String ocrText;
 
+    @ToString.Exclude
     @Lob
     @Column(name = "summary")
     private String summary;
