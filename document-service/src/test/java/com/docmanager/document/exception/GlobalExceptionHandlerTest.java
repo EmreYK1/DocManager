@@ -52,6 +52,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").exists())
                 .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.fields").doesNotExist())
                 .andExpect(jsonPath("$.stackTrace").doesNotExist())
                 .andReturn();
 
@@ -74,11 +75,45 @@ class GlobalExceptionHandlerTest {
                         .content(invalidBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Validierungsfehler"))
+                .andExpect(jsonPath("$.fields.filename").value("Dateiname darf nicht leer sein"))
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.stackTrace").doesNotExist())
                 .andReturn();
 
         assertValidErrorBody(result);
+    }
+
+    @Test
+    @DisplayName("Validierung mit leerem filename und sizeBytes=0 → 400 mit fields für beide Felder")
+    void validation_returns400_withFieldsForFilenameAndSizeBytes() throws Exception {
+        String invalidBody = """
+                {
+                  "filename": "",
+                  "contentType": "application/pdf",
+                  "sizeBytes": 0
+                }
+                """;
+
+        MvcResult result = mockMvc.perform(post("/documents")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Validierungsfehler"))
+                .andExpect(jsonPath("$.fields.filename").value("Dateiname darf nicht leer sein"))
+                .andExpect(jsonPath("$.fields.sizeBytes").value("Dateigröße muss größer als 0 sein"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andReturn();
+
+        assertValidErrorBody(result);
+        ErrorResponse error = objectMapper.readValue(
+                result.getResponse().getContentAsString(), ErrorResponse.class);
+        assertThat(error.fields())
+                .containsEntry("filename", "Dateiname darf nicht leer sein")
+                .containsEntry("sizeBytes", "Dateigröße muss größer als 0 sein")
+                .hasSize(2);
     }
 
     @Test
@@ -103,6 +138,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(500))
                 .andExpect(jsonPath("$.message").value(
                         "Messaging-Fehler: Nachricht konnte nicht gesendet werden"))
+                .andExpect(jsonPath("$.fields").doesNotExist())
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.stackTrace").doesNotExist())
                 .andReturn();
