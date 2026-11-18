@@ -21,7 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -138,6 +140,28 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(500))
                 .andExpect(jsonPath("$.message").value(
                         "Messaging-Fehler: Nachricht konnte nicht gesendet werden"))
+                .andExpect(jsonPath("$.fields").doesNotExist())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andReturn();
+
+        assertValidErrorBody(result);
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("at com.docmanager");
+    }
+
+    @Test
+    @DisplayName("StorageException → HTTP 500 ohne Stack-Trace")
+    void storage_returns500() throws Exception {
+        UUID id = UUID.randomUUID();
+        doThrow(new StorageException("Dateioperation fehlgeschlagen"))
+                .when(documentService).delete(id);
+
+        MvcResult result = mockMvc.perform(delete("/documents/{id}", id))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value(
+                        "Storage-Fehler: Dateioperation fehlgeschlagen"))
                 .andExpect(jsonPath("$.fields").doesNotExist())
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.stackTrace").doesNotExist())

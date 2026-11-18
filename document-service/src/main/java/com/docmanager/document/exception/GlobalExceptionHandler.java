@@ -80,6 +80,17 @@ public class GlobalExceptionHandler {
                         "Messaging-Fehler: Nachricht konnte nicht gesendet werden"));
     }
 
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ErrorResponse> handleStorage(StorageException ex) {
+        log.error("Storage-Fehler", ex);
+        String msg = ex.getMessage() != null && ex.getMessage().startsWith("Storage-Fehler")
+                ? ex.getMessage()
+                : "Storage-Fehler: " + (ex.getMessage() != null ? ex.getMessage() : "Dateioperation fehlgeschlagen");
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), msg));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
         log.error("Unbehandelter Fehler", ex);

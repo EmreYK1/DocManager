@@ -52,15 +52,23 @@ public class Document {
     @JoinColumn(name = "folder_id")
     private Folder folder;
 
+    @Column(name = "object_key")
+    private String objectKey;
+
     // Kommentare werden mit dem Dokument gelöscht
     @OneToMany(mappedBy = "document", cascade = CascadeType.REMOVE)
     private List<Comment> comments = new ArrayList<>();
 
     public Document(String filename, String contentType, long sizeBytes, Folder folder) {
+        this(filename, contentType, sizeBytes, folder, null);
+    }
+
+    public Document(String filename, String contentType, long sizeBytes, Folder folder, String objectKey) {
         this.filename = filename;
         this.contentType = contentType;
         this.sizeBytes = sizeBytes;
         this.folder = folder;
+        this.objectKey = objectKey;
         this.uploadedAt = Instant.now();
         this.status = DocumentStatus.OCR_PENDING;
     }

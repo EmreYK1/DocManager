@@ -33,6 +33,19 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      minio:
+        image: cgr.dev/chainguard/minio:latest
+        command: server /data
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "mc ready local"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +64,10 @@ jobs:
           RABBITMQ_PORT: '5672'
           RABBITMQ_USER: guest
           RABBITMQ_PASS: guest
+          MINIO_URL: http://localhost:9000
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
+          MINIO_BUCKET: documents
         run: mvn -B test
 
   frontend:

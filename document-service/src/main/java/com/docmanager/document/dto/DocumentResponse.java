@@ -16,4 +16,5 @@ public class DocumentResponse {
     private String ocrText;
     private String summary;
     private UUID folderId;
+    private String objectKey;
 }

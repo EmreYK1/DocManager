@@ -15,6 +15,7 @@ public class DocumentMapper {
         dto.setStatus(document.getStatus());
         dto.setOcrText(document.getOcrText());
         dto.setSummary(document.getSummary());
+        dto.setObjectKey(document.getObjectKey());
         if (document.getFolder() != null) {
             dto.setFolderId(document.getFolder().getId());
         }

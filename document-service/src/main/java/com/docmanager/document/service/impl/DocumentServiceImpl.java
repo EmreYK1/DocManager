@@ -6,6 +6,7 @@ import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.DocumentService;
 import com.docmanager.document.service.DocumentUpdate;
+import com.docmanager.document.service.StorageService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.AmqpException;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,17 +26,20 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentRepository documentRepository;
     private final FolderService folderService;
     private final RabbitTemplate rabbitTemplate;
+    private final StorageService storageService;
     private final String exchange;
     private final String documentRoutingKey;
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
                                FolderService folderService,
                                RabbitTemplate rabbitTemplate,
+                               StorageService storageService,
                                @Value("${app.rabbitmq.exchange}") String exchange,
                                @Value("${app.rabbitmq.routing-key.document}") String documentRoutingKey) {
         this.documentRepository = documentRepository;
         this.folderService = folderService;
         this.rabbitTemplate = rabbitTemplate;
+        this.storageService = storageService;
         this.exchange = exchange;
         this.documentRoutingKey = documentRoutingKey;
     }
@@ -69,7 +73,37 @@ public class DocumentServiceImpl implements DocumentService {
         if (filename == null || filename.isBlank()) {
             filename = file.getName();
         }
-        return create(filename, file.getContentType(), file.getSize(), folderId);
+
+        // 1. Zuerst in MinIO speichern
+        String objectKey = storageService.store(file);
+
+        Document doc;
+        try {
+            // 2. Dann in der DB speichern
+            Folder folder = folderId != null ? folderService.findById(folderId) : null;
+            doc = documentRepository.save(new Document(filename, file.getContentType(), file.getSize(), folder, objectKey));
+            log.info("Dokument erstellt: id={}, filename={}, objectKey={}", doc.getId(), doc.getFilename(), objectKey);
+        } catch (Exception e) {
+            // Schlägt die DB fehl, die Datei wieder löschen
+            log.warn("DB-Speichern fehlgeschlagen, lösche Datei '{}' aus Storage", objectKey);
+            try {
+                storageService.delete(objectKey);
+            } catch (Exception cleanupEx) {
+                log.error("Fehler beim Aufräumen der Datei '{}' aus Storage", objectKey, cleanupEx);
+            }
+            throw e;
+        }
+
+        // 3. Dann die Nachricht senden
+        try {
+            rabbitTemplate.convertAndSend(exchange, documentRoutingKey, doc.getId().toString());
+            log.info("OCR-Nachricht gesendet für Dokument-ID: {}", doc.getId());
+        } catch (AmqpException e) {
+            log.error("Fehler beim Senden der OCR-Nachricht für Dokument-ID: {}", doc.getId(), e);
+            throw new MessagingException("Nachricht konnte nicht gesendet werden", e);
+        }
+
+        return doc;
     }
 
     @Override
@@ -100,6 +134,10 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public void delete(UUID id) {
+        Document existing = findById(id);
+        if (existing.getObjectKey() != null) {
+            storageService.delete(existing.getObjectKey());
+        }
         documentRepository.deleteById(id);
         log.info("Dokument gelöscht: id={}", id);
     }
