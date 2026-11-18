@@ -38,6 +38,9 @@ class DocumentServiceTest {
     @Mock
     private RabbitTemplate rabbitTemplate;
 
+    @Mock
+    private StorageService storageService;
+
     @InjectMocks
     private DocumentServiceImpl documentService;
 
@@ -80,7 +83,7 @@ class DocumentServiceTest {
     // ─── upload ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("upload() liest Dateiname, Content-Type und Größe aus MockMultipartFile und erstellt Dokument")
+    @DisplayName("upload() speichert zuerst in MinIO, dann in DB, dann sendet Nachricht")
     void upload_validPdf_createsDocument() {
         byte[] content = "%PDF-1.4 Hello World".getBytes();
         MockMultipartFile file = new MockMultipartFile(
@@ -90,6 +93,7 @@ class DocumentServiceTest {
                 content
         );
 
+        when(storageService.store(file)).thenReturn("test-object-key");
         when(documentRepository.save(any())).thenAnswer(inv -> {
             Document d = inv.getArgument(0);
             d.setId(sampleId);
@@ -102,8 +106,35 @@ class DocumentServiceTest {
         assertThat(result.getContentType()).isEqualTo("application/pdf");
         assertThat(result.getSizeBytes()).isEqualTo(content.length);
         assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_PENDING);
-        verify(documentRepository).save(any());
-        verify(rabbitTemplate).convertAndSend(any(), any(), eq(sampleId.toString()));
+        assertThat(result.getObjectKey()).isEqualTo("test-object-key");
+
+        var inOrder = inOrder(storageService, documentRepository, rabbitTemplate);
+        inOrder.verify(storageService).store(file);
+        inOrder.verify(documentRepository).save(any());
+        inOrder.verify(rabbitTemplate).convertAndSend(any(), any(), eq(sampleId.toString()));
+    }
+
+    @Test
+    @DisplayName("Schlägt das Speichern in der DB fehl, wird storageService.delete aufgerufen")
+    void upload_whenDbSaveFails_storageDeleteIsCalled() {
+        byte[] content = "%PDF-1.4 Hello World".getBytes();
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.pdf",
+                "application/pdf",
+                content
+        );
+
+        when(storageService.store(file)).thenReturn("test-object-key");
+        when(documentRepository.save(any())).thenThrow(new RuntimeException("DB error"));
+
+        assertThatThrownBy(() -> documentService.upload(file, null))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("DB error");
+
+        verify(storageService).store(file);
+        verify(storageService).delete("test-object-key");
+        verify(rabbitTemplate, never()).convertAndSend(any(), any(), anyString());
     }
 
     @Test
@@ -286,12 +317,26 @@ class DocumentServiceTest {
     // ─── delete ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("delete() ruft repository.deleteById() mit korrekter ID auf")
-    void delete_callsDeleteById() {
-        doNothing().when(documentRepository).deleteById(sampleId);
+    @DisplayName("delete() löscht Datei aus Storage und Dokument aus DB wenn objectKey vorhanden")
+    void delete_withObjectKey_deletesFromStorageAndDb() {
+        sampleDoc.setObjectKey("minio-file-key");
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
 
         documentService.delete(sampleId);
 
+        verify(storageService).delete("minio-file-key");
+        verify(documentRepository, times(1)).deleteById(sampleId);
+    }
+
+    @Test
+    @DisplayName("delete() löscht nur aus DB wenn kein objectKey vorhanden")
+    void delete_withoutObjectKey_onlyDeletesFromDb() {
+        sampleDoc.setObjectKey(null);
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
+
+        documentService.delete(sampleId);
+
+        verify(storageService, never()).delete(any());
         verify(documentRepository, times(1)).deleteById(sampleId);
     }
 }
