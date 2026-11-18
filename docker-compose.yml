@@ -16,6 +16,25 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    # minio/minio ist öffentlich nicht mehr pullbar → Chainguard-Ersatz
+    image: cgr.dev/chainguard/minio:latest
+    container_name: docmanager-minio
+    command: server /data --console-address ":9090"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   document-service:
     build:
       context: .
@@ -29,10 +48,16 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: guest
       RABBITMQ_PASS: guest
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: documents
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   webui:
@@ -65,3 +90,4 @@ services:
 volumes:
   db-data:
   rabbitmq-data:
+  minio-data:
