@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -52,6 +53,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Ungültiger Request-Body"));
+    }
+
+    @ExceptionHandler(InvalidFileException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidFile(InvalidFileException ex) {
+        log.warn("Ungültige Datei: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestPart(MissingServletRequestPartException ex) {
+        log.warn("Erforderlicher Request-Teil fehlt: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Feld '" + ex.getRequestPartName() + "' fehlt"));
     }
 
     @ExceptionHandler({MessagingException.class, AmqpException.class})

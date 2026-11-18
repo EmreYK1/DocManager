@@ -3,11 +3,13 @@ package com.docmanager.document.service;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.entity.DocumentStatus;
 import com.docmanager.document.entity.Folder;
+import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.impl.DocumentServiceImpl;
 import com.docmanager.document.service.DocumentUpdate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,6 +75,73 @@ class DocumentServiceTest {
         assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_PENDING);
         verify(documentRepository).save(any());
         verify(rabbitTemplate).convertAndSend(any(), any(), eq(sampleId.toString()));
+    }
+
+    // ─── upload ──────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("upload() liest Dateiname, Content-Type und Größe aus MockMultipartFile und erstellt Dokument")
+    void upload_validPdf_createsDocument() {
+        byte[] content = "%PDF-1.4 Hello World".getBytes();
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.pdf",
+                "application/pdf",
+                content
+        );
+
+        when(documentRepository.save(any())).thenAnswer(inv -> {
+            Document d = inv.getArgument(0);
+            d.setId(sampleId);
+            return d;
+        });
+
+        Document result = documentService.upload(file, null);
+
+        assertThat(result.getFilename()).isEqualTo("test.pdf");
+        assertThat(result.getContentType()).isEqualTo("application/pdf");
+        assertThat(result.getSizeBytes()).isEqualTo(content.length);
+        assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_PENDING);
+        verify(documentRepository).save(any());
+        verify(rabbitTemplate).convertAndSend(any(), any(), eq(sampleId.toString()));
+    }
+
+    @Test
+    @DisplayName("upload() wirft InvalidFileException wenn Datei null oder leer ist")
+    void upload_emptyOrNullFile_throwsInvalidFileException() {
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "file",
+                "empty.pdf",
+                "application/pdf",
+                new byte[0]
+        );
+
+        assertThatThrownBy(() -> documentService.upload(null, null))
+                .isInstanceOf(InvalidFileException.class)
+                .hasMessage("Die Datei darf nicht leer sein");
+
+        assertThatThrownBy(() -> documentService.upload(emptyFile, null))
+                .isInstanceOf(InvalidFileException.class)
+                .hasMessage("Die Datei darf nicht leer sein");
+
+        verify(documentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("upload() wirft InvalidFileException wenn Content-Type kein PDF ist")
+    void upload_nonPdf_throwsInvalidFileException() {
+        MockMultipartFile txtFile = new MockMultipartFile(
+                "file",
+                "README.md",
+                "text/markdown",
+                "readme content".getBytes()
+        );
+
+        assertThatThrownBy(() -> documentService.upload(txtFile, null))
+                .isInstanceOf(InvalidFileException.class)
+                .hasMessage("Nur PDF-Dateien sind erlaubt");
+
+        verify(documentRepository, never()).save(any());
     }
 
     // ─── findById ────────────────────────────────────────────────────────────
