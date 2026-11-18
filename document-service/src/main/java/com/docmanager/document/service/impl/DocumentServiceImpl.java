@@ -3,6 +3,7 @@ package com.docmanager.document.service.impl;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.NotFoundException;
+import com.docmanager.document.messaging.OcrRequestMessage;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.DocumentService;
 import com.docmanager.document.service.DocumentUpdate;
@@ -51,13 +52,7 @@ public class DocumentServiceImpl implements DocumentService {
                 : null;
         Document doc = documentRepository.save(new Document(filename, contentType, sizeBytes, folder));
         log.info("Dokument erstellt: id={}, filename={}", doc.getId(), doc.getFilename());
-        try {
-            rabbitTemplate.convertAndSend(exchange, documentRoutingKey, doc.getId().toString());
-            log.info("OCR-Nachricht gesendet für Dokument-ID: {}", doc.getId());
-        } catch (AmqpException e) {
-            log.error("Fehler beim Senden der OCR-Nachricht für Dokument-ID: {}", doc.getId(), e);
-            throw new MessagingException("Nachricht konnte nicht gesendet werden", e);
-        }
+        sendOcrMessage(doc);
         return doc;
     }
 
@@ -95,15 +90,20 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         // 3. Dann die Nachricht senden
+        sendOcrMessage(doc);
+
+        return doc;
+    }
+
+    private void sendOcrMessage(Document doc) {
         try {
-            rabbitTemplate.convertAndSend(exchange, documentRoutingKey, doc.getId().toString());
+            OcrRequestMessage message = new OcrRequestMessage(doc.getId(), doc.getObjectKey(), doc.getFilename());
+            rabbitTemplate.convertAndSend(exchange, documentRoutingKey, message);
             log.info("OCR-Nachricht gesendet für Dokument-ID: {}", doc.getId());
         } catch (AmqpException e) {
             log.error("Fehler beim Senden der OCR-Nachricht für Dokument-ID: {}", doc.getId(), e);
             throw new MessagingException("Nachricht konnte nicht gesendet werden", e);
         }
-
-        return doc;
     }
 
     @Override
