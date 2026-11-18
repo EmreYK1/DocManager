@@ -60,6 +60,26 @@ services:
       minio:
         condition: service_healthy
 
+  ocr-worker:
+    build:
+      context: .
+      dockerfile: ocr-worker/Dockerfile
+    container_name: docmanager-ocr-worker
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: documents
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
   webui:
     build:
       context: ./webui
