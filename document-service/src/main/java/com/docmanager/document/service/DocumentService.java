@@ -1,6 +1,7 @@
 package com.docmanager.document.service;
 
 import com.docmanager.document.entity.Document;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,6 +13,8 @@ public interface DocumentService {
     List<Document> findAll();
 
     Document create(String filename, String contentType, long sizeBytes, UUID folderID);
+
+    Document upload(MultipartFile file, UUID folderId);
 
     Document update(UUID id, DocumentUpdate update);
 

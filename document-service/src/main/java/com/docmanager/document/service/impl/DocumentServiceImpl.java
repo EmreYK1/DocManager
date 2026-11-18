@@ -1,12 +1,14 @@
 package com.docmanager.document.service.impl;
 
 import com.docmanager.document.entity.Document;
+import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.DocumentService;
 import com.docmanager.document.service.DocumentUpdate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.AmqpException;
+import org.springframework.web.multipart.MultipartFile;
 import com.docmanager.document.exception.MessagingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +55,21 @@ public class DocumentServiceImpl implements DocumentService {
             throw new MessagingException("Nachricht konnte nicht gesendet werden", e);
         }
         return doc;
+    }
+
+    @Override
+    public Document upload(MultipartFile file, UUID folderId) {
+        if (file == null || file.isEmpty()) {
+            throw new InvalidFileException("Die Datei darf nicht leer sein");
+        }
+        if (file.getContentType() == null || !"application/pdf".equalsIgnoreCase(file.getContentType())) {
+            throw new InvalidFileException("Nur PDF-Dateien sind erlaubt");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null || filename.isBlank()) {
+            filename = file.getName();
+        }
+        return create(filename, file.getContentType(), file.getSize(), folderId);
     }
 
     @Override

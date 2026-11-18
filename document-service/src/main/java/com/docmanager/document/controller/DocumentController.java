@@ -3,11 +3,15 @@ package com.docmanager.document.controller;
 import com.docmanager.document.dto.DocumentRequest;
 import com.docmanager.document.dto.DocumentUpdateRequest;
 import com.docmanager.document.dto.DocumentResponse;
+import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.mapper.DocumentMapper;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.service.DocumentService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import com.docmanager.document.service.DocumentUpdate;
 
 import java.util.List;
@@ -20,6 +24,21 @@ public class DocumentController {
 
     public DocumentController(DocumentService documentService) {
         this.documentService = documentService;
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public DocumentResponse upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "folderId", required = false) UUID folderId) {
+        if (file.isEmpty()) {
+            throw new InvalidFileException("Die Datei darf nicht leer sein");
+        }
+        if (file.getContentType() == null || !"application/pdf".equalsIgnoreCase(file.getContentType())) {
+            throw new InvalidFileException("Nur PDF-Dateien sind erlaubt");
+        }
+        Document document = documentService.upload(file, folderId);
+        return DocumentMapper.toResponse(document);
     }
 
     @PostMapping
