@@ -5,6 +5,7 @@ import com.docmanager.document.entity.DocumentStatus;
 import com.docmanager.document.entity.Folder;
 import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.NotFoundException;
+import com.docmanager.document.messaging.OcrRequestMessage;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.impl.DocumentServiceImpl;
 import com.docmanager.document.service.DocumentUpdate;
@@ -77,7 +78,7 @@ class DocumentServiceTest {
         assertThat(result.getFilename()).isEqualTo("neu.pdf");
         assertThat(result.getStatus()).isEqualTo(DocumentStatus.OCR_PENDING);
         verify(documentRepository).save(any());
-        verify(rabbitTemplate).convertAndSend(any(), any(), eq(sampleId.toString()));
+        verify(rabbitTemplate).convertAndSend(any(), any(), eq(new OcrRequestMessage(sampleId, null, "neu.pdf")));
     }
 
     // ─── upload ──────────────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ class DocumentServiceTest {
         var inOrder = inOrder(storageService, documentRepository, rabbitTemplate);
         inOrder.verify(storageService).store(file);
         inOrder.verify(documentRepository).save(any());
-        inOrder.verify(rabbitTemplate).convertAndSend(any(), any(), eq(sampleId.toString()));
+        inOrder.verify(rabbitTemplate).convertAndSend(any(), any(), eq(new OcrRequestMessage(sampleId, "test-object-key", "test.pdf")));
     }
 
     @Test
@@ -134,7 +135,7 @@ class DocumentServiceTest {
 
         verify(storageService).store(file);
         verify(storageService).delete("test-object-key");
-        verify(rabbitTemplate, never()).convertAndSend(any(), any(), anyString());
+        verify(rabbitTemplate, never()).convertAndSend(any(), any(), any(OcrRequestMessage.class));
     }
 
     @Test
