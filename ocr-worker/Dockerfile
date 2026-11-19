@@ -4,6 +4,7 @@ WORKDIR /build
 COPY pom.xml .
 COPY document-service/pom.xml document-service/
 COPY ocr-worker/pom.xml ocr-worker/
+COPY indexing-worker/pom.xml indexing-worker/
 RUN mvn -B -q -pl ocr-worker -am dependency:go-offline
 
 COPY ocr-worker/src ocr-worker/src
