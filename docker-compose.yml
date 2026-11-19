@@ -3,7 +3,9 @@
 #   docker compose up -d --build     startet die App im Hintergrund (empfohlen)
 #   docker compose ps                zeigt, welche Dienste laufen und ob sie gesund sind
 #   docker compose logs -f <dienst>  zeigt die Logs eines Dienstes, z. B. document-service
-#   docker compose --profile tools up -d   startet zusätzlich Kibana (Elasticsearch-Oberfläche)
+#
+# Es werden 9 Container gestartet. Docker Desktop braucht dafür mindestens 4 GB Arbeitsspeicher,
+# sonst wird Elasticsearch ohne klare Meldung beendet.
 #
 # Ablauf: Web-UI → document-service (REST) → speichert PDF in MinIO, Metadaten in Postgres
 #         → RabbitMQ → ocr-worker (Texterkennung) → RabbitMQ → indexing-worker → Elasticsearch
@@ -176,13 +178,10 @@ services:
       retries: 20
       start_period: 30s
 
-  # ─── Optionale Werkzeuge (nur mit --profile tools) ──────────────────────────
-
   # Oberfläche zum Ansehen des Suchindex: http://localhost:5601
   kibana:
     image: docker.elastic.co/kibana/kibana:8.15.0
     container_name: docmanager-kibana
-    profiles: ["tools"]
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     ports:

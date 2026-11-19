@@ -2,172 +2,164 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-EmreYK1%2FDocManager-181717?logo=github)](https://github.com/EmreYK1/DocManager)
 
-> 👆 Auf das Badge klicken, um zum GitHub-Repository zu gelangen.
+DocManager ist eine Webanwendung, mit der man PDF-Dokumente hochladen, in Ordnern ablegen und kommentieren kann. Nach dem Upload liest ein Hintergrunddienst den Text aus dem PDF. Danach findet man das Dokument über Wörter aus dem Inhalt oder dem Dateinamen.
 
-Dokumentenverwaltung mit Ordnerstruktur, Status und Kommentaren
+Das Projekt ist im Rahmen unseres Studiums entstanden. Das Backend ist in Java mit Spring Boot geschrieben, die Oberfläche in React. Alles läuft in Docker.
 
-Eine webbasierte Anwendung zum Verwalten von Dokumenten. Dokumente werden in beliebig verschachtelten Ordnern abgelegt, mit Metadaten und einem Bearbeitungsstatus versehen und können kommentiert werden. Das Backend stellt eine REST-API mit PostgreSQL bereit, die Weboberfläche ist eine React-Anwendung.
+## Was die Anwendung kann
 
-## Überblick
+- PDFs hochladen (höchstens 50 MB), auf Wunsch direkt in einen Ordner
+- Text aus den PDFs automatisch erkennen lassen (Deutsch und Englisch)
+- Dokumente über den Inhalt und den Dateinamen suchen. Kleine Tippfehler sind kein Problem: "Helo" findet "Hello", und "helloworld" findet `HelloWorld.pdf`
+- Ordner anlegen, umbenennen, verschieben und löschen (ein Ordner muss dafür leer sein)
+- Dokumente umbenennen, verschieben und löschen
+- Den erkannten Text auf der Detailseite lesen
+- Kommentare zu einem Dokument schreiben, ändern und löschen
 
-DocManager besteht aus mehreren Containern: Weboberfläche, REST-Backend, zwei Workern für Texterkennung und Suchindex sowie PostgreSQL, MinIO, RabbitMQ und Elasticsearch. Welche das sind und wofür sie da sind, steht unter [Was wird gestartet?](#was-wird-gestartet). Die Oberfläche greift ausschließlich über die REST-API auf die Daten zu.
+## Starten
 
-Aktuell werden die Metadaten der Dokumente verwaltet, die Dateien selbst werden noch nicht gespeichert (siehe [Einschränkungen](#einschränkungen)). Das Datenmodell ist aber schon auf spätere Erweiterungen wie OCR-Text und Zusammenfassung vorbereitet.
-
-**Hauptfunktionen:**
-
-- Dokumentübersicht mit Status-Badges, Größenanzeige und Suche nach Dateiname
-- Ordnerbaum in der Seitenleiste, ein Ordner zeigt auch die Dokumente seiner Unterordner
-- Dokumente anlegen, umbenennen, verschieben, Status ändern und löschen
-- Ordner anlegen, umbenennen, verschieben und löschen (nur leere Ordner)
-- Kommentare zu Dokumenten schreiben, bearbeiten und löschen
-- Eingabeprüfung vor dem Absenden, ungültige Formulare lassen sich nicht abschicken
-- Verständliche Fehlermeldungen, wenn der Server nicht erreichbar ist oder eine Aktion nicht möglich ist
-
-## Schnellstart
-
-### Voraussetzungen
-
-- Docker Desktop installiert und laufend
-
-### Installation
-
-Repository klonen:
+Du brauchst Docker Desktop. Wichtig: Docker Desktop braucht mindestens 4 GB Arbeitsspeicher. Mit weniger wird Elasticsearch vom System beendet, und es kommt keine verständliche Fehlermeldung. Wenn `docker compose ps` später `elasticsearch` als `exited (137)` anzeigt, liegt es fast sicher daran. Den Speicher stellt man in Docker Desktop unter Settings, Resources ein. Unter Windows mit WSL 2 geht es auch über die Datei `.wslconfig` mit dem Eintrag `memory=4GB`. Außerdem solltest du etwa 6 GB Platz für die Images haben.
 
 ```bash
 git clone https://github.com/EmreYK1/DocManager.git
 cd DocManager
-```
-
-Projekt starten:
-
-```bash
 docker compose up -d --build
 ```
 
-`-d` startet alles im Hintergrund. Ohne `-d` schreiben alle Dienste ihre Logs gleichzeitig ins Terminal, das sind schnell mehrere tausend Zeilen. Beim ersten Start werden die Images gebaut, das dauert einige Minuten. Danach zeigt `docker compose ps`, ob alles läuft. Die Weboberfläche startet erst, wenn das Backend bereit ist.
+Das `-d` sorgt dafür, dass alles im Hintergrund läuft. Ohne `-d` schreiben alle Container gleichzeitig ins Terminal, und das sind schnell ein paar tausend Zeilen. Beim ersten Mal dauert es einige Minuten, weil die Images gebaut und geladen werden.
 
-### Was wird gestartet?
+Mit `docker compose ps` siehst du, ob alles läuft. Es müssen 9 Container laufen. Das Backend braucht nach dem Start etwa eine Minute, bis es bereit ist. Die Weboberfläche startet erst danach. Wenn du sie zu früh aufrufst, siehst du kurz "502 Bad Gateway".
 
-| Dienst | Aufgabe | Im Browser |
-|---|---|---|
-| `webui` | Weboberfläche (React + nginx), leitet `/api` ans Backend weiter | http://localhost |
-| `document-service` | REST-Backend: Dokumente, Ordner, Kommentare, Upload, Suche | nur über http://localhost/api |
-| `ocr-worker` | Liest den Text aus hochgeladenen PDFs (Ghostscript + Tesseract) | – |
-| `indexing-worker` | Schreibt den erkannten Text in den Suchindex | – |
-| `db` | PostgreSQL für Metadaten, Ordner und Kommentare | `localhost:5432` (`docmanager` / `docmanager`) |
-| `minio` | Speicher für die PDF-Dateien | http://localhost:9090 (`minioadmin` / `minioadmin`) |
-| `rabbitmq` | Nachrichten zwischen Backend und Workern | http://localhost:15672 (`guest` / `guest`) |
-| `elasticsearch` | Volltextsuche | http://localhost:9200 |
-| `kibana` | Optional, nur mit `docker compose --profile tools up -d` | http://localhost:5601 |
+Wenn alles läuft, öffnest du http://localhost.
 
-Ablauf eines Uploads: Weboberfläche → `document-service` speichert die Datei in MinIO und die Metadaten in PostgreSQL → RabbitMQ → `ocr-worker` erkennt den Text → RabbitMQ → `indexing-worker` schreibt ihn nach Elasticsearch, der `document-service` speichert ihn in der Datenbank.
-
-Nützliche Befehle:
+Ein paar Befehle, die man oft braucht:
 
 ```bash
-docker compose ps                        # Welche Dienste laufen, sind sie gesund?
-docker compose logs -f document-service  # Logs eines einzelnen Dienstes verfolgen
-docker compose down                      # Alles stoppen (Daten bleiben erhalten)
-docker compose down -v                   # Alles stoppen und alle Daten löschen
+docker compose ps                        # läuft alles?
+docker compose logs -f document-service  # Logs eines Dienstes ansehen
+docker compose down                      # alles stoppen, die Daten bleiben
+docker compose down -v                   # alles stoppen und alle Daten löschen
+docker compose up -d --build webui       # nur die Oberfläche neu bauen
 ```
-
-Läuft auf dem Rechner bereits ein eigenes PostgreSQL auf Port 5432, verbinden sich lokal gestartete Tests mit diesem statt mit dem Container. Dann das lokale PostgreSQL stoppen oder `DB_URL` auf einen anderen Port setzen.
 
 ### Erste Schritte
 
-1. http://localhost im Browser öffnen
-2. Mit „+ Neuer Ordner“ einen Ordner anlegen
-3. Mit „+ Neues Dokument“ ein Dokument eintragen. Der aktuell gewählte Ordner ist vorausgewählt
-4. Auf den Dateinamen klicken, um die Detailseite zu öffnen
-5. Dort Metadaten bearbeiten oder Kommentare schreiben
+Auf http://localhost kannst du mit "PDF hochladen" ein PDF auswählen. Ein Beispiel liegt unter `docs/samples/HelloWorld.pdf`. Nach dem Upload steht das Dokument in der Tabelle mit dem Status "Text wird erkannt...". Nach ein paar Sekunden wechselt der Status von selbst auf "Durchsuchbar". Dann kannst du im Suchfeld nach einem Wort aus dem PDF suchen, zum Beispiel nach "Hello". Ein Klick auf den Dateinamen öffnet die Detailseite mit dem erkannten Text und den Kommentaren.
 
-## Technologie-Stack
+## Aus welchen Teilen die Anwendung besteht
 
-- **Frontend:** React 18, Vite, React Router
-- **Backend:** Java 25, Spring Boot 3.5, Spring Data JPA
-- **Datenbank:** PostgreSQL 17
-- **Webserver:** nginx (Auslieferung der Oberfläche und Proxy für `/api`)
-- **Tests:** JUnit 5 und Mockito (Backend), Vitest und Testing Library (Frontend)
-- **Deployment:** Docker und Docker Compose
+Beim Start werden 9 Container gestartet:
 
-## Projektstruktur
+- `webui` (Port 80): die Oberfläche. Sie wird von nginx ausgeliefert und leitet alle Aufrufe an `/api` an das Backend weiter.
+- `document-service`: das Backend mit der REST-API. Es hat keinen eigenen Port nach außen, man erreicht es nur über die Oberfläche unter `http://localhost/api`.
+- `ocr-worker`: liest den Text aus den PDFs (mit Ghostscript und Tesseract).
+- `indexing-worker`: trägt den erkannten Text in den Suchindex ein.
+- `db` (Port 5432): PostgreSQL für Dokumente, Ordner, Kommentare und den erkannten Text. Benutzer und Passwort sind beide `docmanager`.
+- `minio` (Ports 9000 und 9090): speichert die PDF-Dateien. Die Konsole ist unter http://localhost:9090 erreichbar, Benutzer und Passwort sind `minioadmin`.
+- `rabbitmq` (Ports 5672 und 15672): die Nachrichten-Queue zwischen Backend und Workern. Die Verwaltungsseite ist unter http://localhost:15672 erreichbar, Benutzer und Passwort sind `guest`.
+- `elasticsearch` (Port 9200): die Suchmaschine.
+- `kibana` (Port 5601): eine Oberfläche, mit der man in den Suchindex schauen kann. Die Anwendung braucht sie nicht, wir nutzen sie nur zum Kontrollieren.
 
+Die Daten liegen in Docker-Volumes und bleiben bei `docker compose down` erhalten. Erst `docker compose down -v` löscht sie.
+
+Falls auf deinem Rechner schon ein eigenes PostgreSQL auf Port 5432 läuft, verbindet sich alles, was lokal außerhalb von Docker startet (zum Beispiel die Backend-Tests), mit diesem und nicht mit dem Container. Das haben wir selbst erlebt. Dann hilft es, das lokale PostgreSQL zu stoppen oder die Variable `DB_URL` anzupassen.
+
+## Was nach einem Upload passiert
+
+1. Die Oberfläche schickt das PDF an `POST /api/documents/upload`. Das Backend prüft, ob es wirklich ein PDF ist, legt die Datei in MinIO ab und speichert die Angaben dazu in der Datenbank. Das Dokument bekommt den Status `OCR_PENDING`. Danach schickt das Backend eine Nachricht an RabbitMQ.
+2. Der `ocr-worker` nimmt die Nachricht, holt das PDF aus MinIO und wandelt es mit Ghostscript in Bilder um. Tesseract liest den Text von jeder Seite. Das Ergebnis, oder bei einem Fehler eine Fehlermeldung, schickt er wieder über RabbitMQ zurück.
+3. Diese Antwort bekommen zwei Dienste. Das Backend speichert den Text und setzt den Status auf `OCR_DONE`. Ist etwas schiefgegangen, wird der Status `FAILED`. Der `indexing-worker` schreibt Dateiname und Text in Elasticsearch.
+4. Bei einer Suche fragt das Backend Elasticsearch nach den passenden Dokumenten und holt sie dann aus der Datenbank. Löscht man ein Dokument, wird auch sein Eintrag im Index entfernt.
+5. Solange ein Dokument auf `OCR_PENDING` steht, lädt die Oberfläche die Liste alle 3 Sekunden neu (höchstens 5 Minuten lang). So sieht man den neuen Status, ohne die Seite neu zu laden.
+
+In der Oberfläche zeigen wir statt der Statuswerte aus der API einen verständlichen Text an: `OCR_PENDING` heißt dort "Text wird erkannt...", `OCR_DONE` heißt "Durchsuchbar" und `FAILED` heißt "Texterkennung fehlgeschlagen". Die Werte `UPLOADED` und `SUMMARY_DONE` gibt es im Datenmodell auch, sie werden aber im Moment nicht automatisch gesetzt.
+
+## Abnahme-Checkliste
+
+Mit dieser Liste kann man auf einem frischen Stand prüfen, ob alles funktioniert. Du brauchst dafür einen frischen Clone und Docker Desktop mit mindestens 4 GB Speicher. Die Ports 80, 5432, 5672, 5601, 9000, 9090, 9200 und 15672 müssen frei sein. Achtung: Schritt 1 löscht alle DocManager-Daten in Docker auf diesem Rechner.
+
+- [ ] `docker compose down -v` ausführen. Bei einem frischen Clone gibt es nichts zu löschen, das ist in Ordnung.
+- [ ] `docker compose build` ausführen. Der Build muss ohne Fehler durchlaufen. Beim ersten Mal dauert das ein paar Minuten.
+- [ ] `docker compose up -d` ausführen. Es werden 9 Container erstellt.
+- [ ] Ein bis zwei Minuten warten und dann `docker compose ps` ausführen. `db`, `minio`, `rabbitmq`, `elasticsearch` und `document-service` müssen `healthy` sein. `ocr-worker`, `indexing-worker`, `webui` und `kibana` müssen laufen (`Up`).
+- [ ] http://localhost öffnen. Die Übersicht ist leer und zeigt "Noch keine Dokumente."
+- [ ] Auf "PDF hochladen" klicken, `docs/samples/HelloWorld.pdf` auswählen und auf "Hochladen" klicken. Der Dialog schließt sich, und `HelloWorld.pdf` steht mit dem Status "Text wird erkannt..." in der Tabelle.
+- [ ] Die Seite nicht neu laden und ein paar Sekunden warten. Der Status wechselt von selbst auf "Durchsuchbar" (in der API `OCR_DONE`).
+- [ ] Im Suchfeld "Hello" eingeben und Enter drücken. `HelloWorld.pdf` wird gefunden.
+- [ ] "Helo" suchen. `HelloWorld.pdf` wird trotz Tippfehler gefunden.
+- [ ] "xyzabc" suchen. Es erscheint "Keine Treffer für xyzabc". Mit "Suche zurücksetzen" sind wieder alle Dokumente zu sehen.
+- [ ] Auf `HelloWorld.pdf` klicken. Die Detailseite zeigt unter "Erkannter Text" den Text "Hello World".
+- [ ] Das Dokument löschen und danach noch einmal nach "Hello" suchen. Es gibt keinen Treffer mehr.
+
+Wer lieber die Kommandozeile benutzt, kann das Gleiche mit `curl` prüfen:
+
+```bash
+# Hochladen, die Antwort enthält die id des Dokuments
+curl -F "file=@docs/samples/HelloWorld.pdf;type=application/pdf" http://localhost/api/documents/upload
+
+# Status ansehen, bis dort "OCR_DONE" steht (die id einsetzen)
+curl http://localhost/api/documents/<id>
+
+# Suchen, "Helo" geht auch
+curl "http://localhost/api/documents/search?q=Hello"
+
+# Eine leere Suche liefert den Status 400
+curl -o /dev/null -w "%{http_code}\n" "http://localhost/api/documents/search?q="
+
+# Löschen, danach ist die Suche nach Hello leer
+curl -X DELETE http://localhost/api/documents/<id>
+curl "http://localhost/api/documents/search?q=Hello"
 ```
-DocManager/
-├── document-service/               # Backend (Spring Boot)
-│   ├── src/main/java/com/docmanager/document/
-│   │   ├── controller/             # REST-Endpunkte (Dokumente, Ordner, Kommentare)
-│   │   ├── service/                # Geschäftslogik, Interfaces und impl/
-│   │   ├── repository/             # Spring-Data-Repositories
-│   │   ├── entity/                 # JPA-Entities: Document, Folder, Comment
-│   │   ├── dto/                    # Request- und Response-Objekte
-│   │   ├── mapper/                 # Entity <-> DTO
-│   │   ├── exception/              # NotFoundException, globaler Fehler-Handler
-│   │   └── DocumentServiceApplication.java
-│   ├── src/main/resources/application.properties
-│   └── Dockerfile
-│
-├── webui/                          # Frontend (React)
-│   ├── src/
-│   │   ├── pages/                  # DashboardPage, DocumentDetailPage
-│   │   ├── components/             # Tabelle, Ordnerbaum, Formulare, Dialoge
-│   │   │   ├── DocumentTable, DocumentMetadata, StatusBadge
-│   │   │   ├── FolderTree, FolderActions, FolderForm, FolderSelect
-│   │   │   ├── DocumentCreateForm, DocumentEditForm
-│   │   │   ├── CommentList, CommentForm
-│   │   │   └── Modal, ConfirmDialog, ErrorBanner, TextField
-│   │   ├── hooks/                  # useApiResource, useDialog, useTextField
-│   │   ├── api/                    # REST-Aufrufe, HTTP-Client, Fehlermeldungen
-│   │   ├── validation/             # Prüffunktionen für Eingaben (reine Funktionen)
-│   │   ├── utils/                  # Ordnerbaum, Filter, Datums- und Größenformat
-│   │   ├── layout/                 # Seitenrahmen mit Kopfleiste
-│   │   ├── constants/              # Dokumentstatus
-│   │   └── styles/                 # Stylesheets, nach Bereichen getrennt
-│   ├── nginx.conf                  # SPA-Fallback und /api-Proxy
-│   └── Dockerfile
-│
-├── docker-compose.yml              # Datenbank, Backend und Weboberfläche
-├── pom.xml                         # Root-POM (Multi-Modul)
-└── README.md
-```
 
-## Funktionsweise
+Wenn etwas nicht klappt:
 
-**Anfragen.** Der Browser schickt Aufrufe an `/api/...`. nginx entfernt das Präfix und leitet sie an das Backend weiter. Dort durchläuft jede Anfrage Controller, Service und Repository, bevor sie die Datenbank erreicht. Die Controller arbeiten mit DTOs, die Entities verlassen das Backend nie.
-
-**Fehler.** Unbekannte IDs liefern `404`. Wird eine Ressource noch verwendet, zum Beispiel ein Ordner mit Inhalt, antwortet das Backend mit `409`. Fehler haben die Form `{"status": 404, "message": "..."}` und werden in der Oberfläche als deutsche Meldung angezeigt.
-
-**Dokumentstatus.** Ein neues Dokument beginnt mit `OCR_PENDING` und löst eine Nachricht in der OCR-Queue aus. Weitere Werte sind `UPLOADED`, `OCR_DONE`, `SUMMARY_DONE` und `FAILED`. Aktuell setzt man den Status von Hand auf der Detailseite.
-
-**Eingabeprüfung.** Die Regeln liegen als reine Funktionen in `webui/src/validation` und werden von allen Formularen genutzt. Pflichtfelder dürfen nicht leer sein, auch nicht nur aus Leerzeichen bestehen. Die Größe eines Dokuments muss eine ganze Zahl ab 0 sein. Solange ein Fehler besteht, ist der Absenden-Button deaktiviert und es wird kein Request geschickt.
-
-**Löschen.** Beim Löschen eines Dokuments werden seine Kommentare mitgelöscht. Ein Ordner lässt sich nur löschen, wenn er weder Unterordner noch Dokumente enthält. Die Oberfläche deaktiviert den Button in diesem Fall.
+- `elasticsearch` ist `exited (137)` oder startet immer wieder neu: Docker hat zu wenig Arbeitsspeicher, siehe oben.
+- Die Oberfläche zeigt "502 Bad Gateway": Das Backend startet noch. Eine Minute warten und neu laden.
+- Der Status bleibt auf "Text wird erkannt...": Mit `docker compose logs ocr-worker` nachsehen, ob der Worker läuft und `rabbitmq` gesund ist.
+- Die Suche meldet, dass sie nicht verfügbar ist: Dann ist Elasticsearch nicht gesund.
+- Ein Port ist schon belegt: Das Programm beenden, das ihn benutzt.
 
 ## REST-API
 
+Alle Pfade sind über die Oberfläche unter `/api` erreichbar, zum Beispiel `http://localhost/api/documents`. Das Präfix `/api` entfernt nginx, das Backend selbst kennt nur `/documents`. Fehler haben die Form `{"status": 404, "message": "..."}`. Eine unbekannte ID ergibt `404`, eine ungültige Eingabe `400`, ein Ordner, der noch benutzt wird, `409`, und wenn die Suche nicht erreichbar ist, kommt `503`.
+
 ### Dokumente
 
-| Methode | Pfad              | Beschreibung                      |
-|---------|-------------------|-----------------------------------|
-| POST    | `/documents`      | Dokument anlegen                  |
-| GET     | `/documents`      | Alle Dokumente abrufen            |
-| GET     | `/documents/{id}` | Einzelnes Dokument abrufen        |
-| PATCH   | `/documents/{id}` | Dokument teilweise ändern         |
-| DELETE  | `/documents/{id}` | Dokument samt Kommentaren löschen |
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| POST | `/documents/upload` | PDF hochladen, startet die Texterkennung |
+| GET | `/documents/search?q=...` | Volltextsuche |
+| GET | `/documents` | alle Dokumente |
+| GET | `/documents/{id}` | ein Dokument, mit erkanntem Text |
+| PATCH | `/documents/{id}` | Dokument teilweise ändern |
+| DELETE | `/documents/{id}` | Dokument löschen (mit Kommentaren, Datei und Index-Eintrag) |
+| POST | `/documents` | Dokument nur mit Angaben anlegen, ohne Datei |
 
-Anlegen:
+Beim Upload schickt man ein Formular (`multipart/form-data`) mit dem Feld `file` und optional mit `folderId`. Die Antwort ist `201` mit dem neuen Dokument. Ist die Datei kein PDF oder leer, kommt `400`.
+
+```bash
+curl -F "file=@docs/samples/HelloWorld.pdf;type=application/pdf" -F "folderId=<uuid>" http://localhost/api/documents/upload
+```
+
+Bei der Suche ist der Parameter `q` Pflicht. Fehlt er oder ist er leer, kommt `400`. Es werden höchstens 100 Treffer geliefert, die besten zuerst. Ein neues Dokument kann erst gefunden werden, wenn sein Status `OCR_DONE` ist.
+
+`GET /documents` und die Suche liefern kürzere Einträge als `GET /documents/{id}`: Dort fehlen `ocrText` und `summary`. Das haben wir so gemacht, weil die Oberfläche die Liste während der Texterkennung alle paar Sekunden neu lädt und der Text vieler Dokumente zusammen ziemlich groß werden kann.
 
 ```json
 {
-  "filename": "bericht.pdf",
+  "id": "uuid",
+  "filename": "HelloWorld.pdf",
   "contentType": "application/pdf",
-  "sizeBytes": 2048,
-  "folderId": "uuid-des-ordners"
+  "sizeBytes": 593,
+  "uploadedAt": "2026-11-19T20:25:00Z",
+  "status": "OCR_DONE",
+  "folderId": null,
+  "objectKey": "...-HelloWorld.pdf",
+  "ocrText": "Hello World"
 }
 ```
 
-Ändern. Alle Felder sind optional, `clearFolder: true` löst das Dokument aus seinem Ordner:
+Beim Ändern mit `PATCH` sind alle Felder optional. Mit `clearFolder: true` nimmt man ein Dokument aus seinem Ordner heraus:
 
 ```json
 {
@@ -178,18 +170,20 @@ Anlegen:
 }
 ```
 
+`POST /documents` legt nur einen Eintrag ohne Datei an. Weil es dann nichts zum Lesen gibt, wird so ein Dokument `FAILED`. Die Oberfläche benutzt diesen Endpunkt nicht mehr und lädt immer über `/documents/upload` hoch.
+
 ### Ordner
 
-| Methode | Pfad                     | Beschreibung                       |
-|---------|--------------------------|------------------------------------|
-| POST    | `/folders`               | Ordner anlegen                     |
-| GET     | `/folders`               | Alle Ordner abrufen                |
-| GET     | `/folders/{id}`          | Einzelnen Ordner abrufen           |
-| GET     | `/folders/{id}/children` | Unterordner abrufen                |
-| PUT     | `/folders/{id}`          | Ordner umbenennen oder verschieben |
-| DELETE  | `/folders/{id}`          | Ordner löschen                     |
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| POST | `/folders` | Ordner anlegen |
+| GET | `/folders` | alle Ordner |
+| GET | `/folders/{id}` | ein Ordner |
+| GET | `/folders/{id}/children` | die Unterordner |
+| PUT | `/folders/{id}` | umbenennen oder verschieben |
+| DELETE | `/folders/{id}` | löschen (nur wenn er leer ist, sonst `409`) |
 
-Anlegen und Ändern verwenden denselben Body. Ohne `parentId` entsteht ein Ordner auf oberster Ebene.
+Anlegen und Ändern benutzen denselben Body. Ohne `parentId` entsteht ein Ordner auf der obersten Ebene. Der `name` ist Pflicht und darf höchstens 255 Zeichen lang sein.
 
 ```json
 {
@@ -200,15 +194,15 @@ Anlegen und Ändern verwenden denselben Body. Ohne `parentId` entsteht ein Ordne
 
 ### Kommentare
 
-| Methode | Pfad                                    | Beschreibung                |
-|---------|-----------------------------------------|-----------------------------|
-| POST    | `/documents/{documentId}/comments`      | Kommentar anlegen           |
-| GET     | `/documents/{documentId}/comments`      | Kommentare eines Dokuments  |
-| GET     | `/documents/{documentId}/comments/{id}` | Einzelnen Kommentar abrufen |
-| PUT     | `/documents/{documentId}/comments/{id}` | Inhalt ändern               |
-| DELETE  | `/documents/{documentId}/comments/{id}` | Kommentar löschen           |
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| POST | `/documents/{documentId}/comments` | Kommentar anlegen |
+| GET | `/documents/{documentId}/comments` | alle Kommentare eines Dokuments |
+| GET | `/documents/{documentId}/comments/{id}` | ein Kommentar |
+| PUT | `/documents/{documentId}/comments/{id}` | Inhalt ändern |
+| DELETE | `/documents/{documentId}/comments/{id}` | Kommentar löschen |
 
-Beim Ändern wird nur `content` ausgewertet.
+`author` (höchstens 100 Zeichen) und `content` (höchstens 2000 Zeichen) sind Pflicht. Beim Ändern wird nur `content` verwendet.
 
 ```json
 {
@@ -217,22 +211,43 @@ Beim Ändern wird nur `content` ausgewertet.
 }
 ```
 
-## Entwicklung
+## Umgebungsvariablen
 
-Backend und Frontend lassen sich auch ohne Docker starten. Für das Backend werden JDK 25 und Maven gebraucht, für das Frontend Node 22. Die Datenbank kann trotzdem aus Docker kommen:
+In Docker setzt `docker-compose.yml` alle nötigen Werte. Läuft ein Dienst ohne Docker, gelten die Standardwerte, und die zeigen auf `localhost`. Die Zugangsdaten sind reine Entwicklungswerte.
+
+Das Backend (`document-service`) kennt diese Variablen:
+
+- `DB_URL`, `DB_USER`, `DB_PASSWORD`: die Datenbank (Standard `jdbc:postgresql://localhost:5432/docmanager`, `docmanager`, `docmanager`)
+- `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASS`: RabbitMQ (Standard `localhost`, `5672`, `guest`, `guest`)
+- `MINIO_URL`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`: MinIO (Standard `http://localhost:9000`, `minioadmin`, `minioadmin`, `documents`)
+- `ELASTICSEARCH_URL`, `ELASTICSEARCH_INDEX`: Elasticsearch (Standard `http://localhost:9200` und `documents`)
+
+Der `ocr-worker` nutzt dieselben Variablen für RabbitMQ und MinIO. Dazu kommen:
+
+- `OCR_LANGUAGE`: die Sprachen für Tesseract (Standard `deu+eng`)
+- `OCR_TIMEOUT_SECONDS`: wie lange ein einzelner Aufruf von Ghostscript oder Tesseract höchstens dauern darf (Standard `120`)
+- `OCR_GS_COMMAND` und `OCR_TESSERACT_COMMAND`: Name der Programme (Standard `gs` und `tesseract`, unter Windows heißt Ghostscript `gswin64c`)
+
+Der `indexing-worker` braucht die Variablen für RabbitMQ sowie `ELASTICSEARCH_URL` und `ELASTICSEARCH_INDEX`.
+
+Die Namen von Exchange, Queues und Routing-Keys lassen sich auch über Variablen ändern (zum Beispiel `RABBITMQ_EXCHANGE`). Die Standardwerte passen aber zusammen, man muss sie normalerweise nicht anfassen.
+
+## Entwickeln und Testen
+
+Man kann Backend und Oberfläche auch ohne den ganzen Docker-Stack starten. Dafür braucht man JDK 25, Maven und Node 22. Die Dienste, die man dabei braucht, lassen sich trotzdem über Docker starten:
 
 ```bash
-docker compose up -d db
+docker compose up -d db rabbitmq minio elasticsearch
 ```
 
-Backend:
+Backend bauen und starten:
 
 ```bash
 mvn package
 java -jar document-service/target/document-service-*.jar
 ```
 
-Frontend mit Dev-Server auf http://localhost:5173. Anfragen an `/api` gehen an das Backend auf Port 8080:
+Oberfläche mit dem Dev-Server auf http://localhost:5173. Aufrufe an `/api` gehen dabei an das Backend auf Port 8080:
 
 ```bash
 cd webui
@@ -240,58 +255,55 @@ npm install
 npm run dev
 ```
 
-Die Datenbankverbindung lässt sich über Umgebungsvariablen anpassen:
-
-| Variable      | Standard                                      |
-|---------------|-----------------------------------------------|
-| `DB_URL`      | `jdbc:postgresql://localhost:5432/docmanager` |
-| `DB_USER`     | `docmanager`                                  |
-| `DB_PASSWORD` | `docmanager`                                  |
-
-### Tests
+Tests:
 
 ```bash
-# Backend (die Datenbank wird gemockt)
-mvn test
-
-# Frontend
-cd webui
-npm test
+mvn test            # Backend, alle Module
+cd webui && npm test   # Oberfläche
 ```
 
-## Nützliche Befehle
+Die meisten Backend-Tests sind Unit-Tests, bei denen Repositories, MinIO, RabbitMQ und Elasticsearch gemockt sind. Eine Ausnahme ist `RabbitMQConfigTest`: Er startet den kompletten Spring-Kontext und braucht dafür eine erreichbare PostgreSQL-Datenbank, lokal zum Beispiel mit `docker compose up -d db`. RabbitMQ, MinIO und Elasticsearch müssen dafür nicht laufen. In der CI laufen PostgreSQL, RabbitMQ und MinIO als Dienste mit.
 
-```bash
-# Alle Services im Hintergrund starten
-docker compose up -d
+Der Test `TesseractOcrServiceRealTest` im `ocr-worker` liest das echte `HelloWorld.pdf`. Er läuft nur, wenn Tesseract und Ghostscript installiert sind, sonst wird er übersprungen. Die Tests der Oberfläche benutzen Vitest und Testing Library und mocken die API.
 
-# Logs anzeigen
-docker compose logs -f
+## Technik
 
-# Nur Backend-Logs
-docker compose logs -f document-service
+- Oberfläche: React 18, Vite, React Router
+- Backend: Java 25, Spring Boot 3.5, Spring Data JPA, Spring AMQP
+- Datenbank: PostgreSQL 17
+- Dateien: MinIO
+- Nachrichten: RabbitMQ
+- Texterkennung: Ghostscript und Tesseract
+- Suche: Elasticsearch 8, dazu Kibana zum Nachschauen
+- Webserver: nginx
+- Tests: JUnit 5 und Mockito, Vitest und Testing Library
+- Betrieb: Docker und Docker Compose, CI mit GitHub Actions
 
-# Services stoppen
-docker compose down
+## Projektstruktur
 
-# Services stoppen und Volumes löschen (löscht die Datenbank!)
-docker compose down -v
-
-# Datenbank-Zugriff
-docker compose exec db psql -U docmanager -d docmanager
-
-# Nach Änderungen am Frontend nur die Oberfläche neu bauen
-docker compose up -d --build webui
+```
+DocManager/
+├── document-service/     Backend (Spring Boot, REST-API, Upload, Suche)
+├── ocr-worker/           liest den Text aus den PDFs
+├── indexing-worker/      schreibt den Text in Elasticsearch
+├── webui/                Oberfläche (React) mit nginx
+├── docs/samples/         Beispiel-PDF für Tests und Abnahme
+├── docker-compose.yml    startet alle 9 Container
+├── .github/workflows/    CI (Tests für Backend und Oberfläche)
+└── pom.xml               Maven-Projekt für die drei Java-Module
 ```
 
-## Einschränkungen
+Im Backend ist der Code nach Aufgaben getrennt: `controller` (REST), `service` (Logik, jeweils als Interface mit Umsetzung in `impl`), `repository`, `entity`, `dto`, `mapper`, `messaging` (RabbitMQ) und `exception`. In der Oberfläche liegen die Seiten in `pages`, die wiederverwendbaren Teile in `components`, die Aufrufe an das Backend in `api` und die Prüfungen für Eingaben in `validation`.
 
-- **Kein Datei-Upload.** Beim Anlegen werden Dateiname, Typ und Größe von Hand eingetragen, die Datei selbst wird nicht abgelegt. Die Felder für OCR-Text und Zusammenfassung sind im Datenmodell vorhanden, werden aber noch nicht befüllt.
-- **Keine Validierung im Backend.** Die Eingaben werden nur in der Oberfläche geprüft, die API akzeptiert auch leere Namen.
-- **Keine Benutzerverwaltung.** Der Autor eines Kommentars ist ein frei eingegebener Text.
-- **Kein Produktions-Setup.** Die Zugangsdaten der Datenbank stehen im Klartext in `docker-compose.yml`.
+## Was noch fehlt
 
-## Projektteam
+- Es gibt keine Benutzerverwaltung. Der Autor eines Kommentars ist einfach ein Text, den man eintippt.
+- Eine automatische Zusammenfassung gibt es noch nicht. Das Feld `summary` und der Status `SUMMARY_DONE` sind im Datenmodell vorbereitet, werden aber noch nicht gefüllt.
+- Die Suche im Text arbeitet mit ganzen Wörtern. "ello" findet also nicht "Hello". Im Dateinamen funktioniert das schon.
+- Es werden nur PDFs angenommen.
+- Das Ganze ist kein Produktivsystem. Die Zugangsdaten stehen im Klartext in `docker-compose.yml`, und es gibt weder HTTPS noch eine Anmeldung.
+
+## Team
 
 - Emre Can Yüksel (Projektleiter)
 - Shez Abbas Soltani
