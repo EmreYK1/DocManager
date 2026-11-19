@@ -1,19 +1,23 @@
 const API_BASE = '/api'
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, fields = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.fields = fields
   }
 }
 
-async function readErrorMessage(response) {
+async function readErrorBody(response) {
   try {
     const body = await response.json()
-    return body.message ?? response.statusText
+    return {
+      message: body.message ?? response.statusText,
+      fields: body.fields ?? null,
+    }
   } catch {
-    return response.statusText
+    return { message: response.statusText, fields: null }
   }
 }
 
@@ -29,7 +33,8 @@ export async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, await readErrorMessage(response))
+    const { message, fields } = await readErrorBody(response)
+    throw new ApiError(response.status, message, fields)
   }
 
   if (response.status === 204) {

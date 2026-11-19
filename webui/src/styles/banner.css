@@ -11,3 +11,12 @@
   border: 1px solid #f5c2c2;
   color: #991b1b;
 }
+
+.banner-message {
+  margin: 0;
+}
+
+.banner-fields {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
