@@ -43,6 +43,31 @@ describe('request', () => {
     await expect(promise).rejects.toMatchObject({ status: 500, message: 'Boom' })
   })
 
+  it('übernimmt fields aus dem Fehler-Body bei Status 400', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 400,
+          message: 'Validierungsfehler',
+          fields: { content: 'Kommentarinhalt darf maximal 2000 Zeichen lang sein' },
+        }),
+        { status: 400 },
+      ),
+    )
+
+    const promise = request('/documents/1/comments/2', {
+      method: 'PUT',
+      body: JSON.stringify({ content: 'x'.repeat(2001) }),
+    })
+
+    await expect(promise).rejects.toBeInstanceOf(ApiError)
+    await expect(promise).rejects.toMatchObject({
+      status: 400,
+      message: 'Validierungsfehler',
+      fields: { content: 'Kommentarinhalt darf maximal 2000 Zeichen lang sein' },
+    })
+  })
+
   it('wirft ApiError mit Status 0 bei einem Netzwerkfehler', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
 
