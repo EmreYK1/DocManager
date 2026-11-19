@@ -2,6 +2,7 @@ package com.docmanager.document.controller;
 
 import com.docmanager.document.dto.CommentRequest;
 import com.docmanager.document.dto.CommentResponse;
+import com.docmanager.document.dto.CommentUpdateRequest;
 import com.docmanager.document.mapper.CommentMapper;
 import com.docmanager.document.service.CommentService;
 import org.springframework.http.HttpStatus;
@@ -49,7 +50,7 @@ public class CommentController {
     @PutMapping("/{id}")
     public CommentResponse update(@PathVariable UUID documentId,
                                   @PathVariable UUID id,
-                                  @Valid @RequestBody CommentRequest request) {
+                                  @Valid @RequestBody CommentUpdateRequest request) {
         return CommentMapper.toResponse(commentService.update(id, request.getContent()));
     }
 
