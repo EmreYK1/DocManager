@@ -151,6 +151,7 @@ export default function DocumentDetailPage() {
           message={`Dokument „${document.filename}“ und alle Kommentare wirklich löschen?`}
           error={dialog.error}
           onConfirm={handleDelete}
+          onCancel={dialog.close}
           busy={dialog.busy}
         />
       )}
@@ -160,6 +161,7 @@ export default function DocumentDetailPage() {
           message="Diesen Kommentar wirklich löschen?"
           error={dialog.error}
           onConfirm={handleCommentDelete}
+          onCancel={dialog.close}
           busy={dialog.busy}
         />
       )}

@@ -8,6 +8,7 @@ export default function DocumentTable({
   folderNames = new Map(),
   emptyMessage = 'Keine Dokumente vorhanden.',
   emptyHint = null,
+  onDelete,
 }) {
   if (documents.length === 0) {
     return (
@@ -28,6 +29,11 @@ export default function DocumentTable({
             <th>Ordner</th>
             <th>Größe</th>
             <th>Hochgeladen am</th>
+            {onDelete && (
+              <th>
+                <span className="visually-hidden">Aktionen</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -44,6 +50,18 @@ export default function DocumentTable({
               <td>{folderNames.get(document.folderId) ?? '–'}</td>
               <td>{formatSize(document.sizeBytes)}</td>
               <td>{formatDate(document.uploadedAt)}</td>
+              {onDelete && (
+                <td className="cell-actions">
+                  <button
+                    type="button"
+                    className="btn btn-small btn-danger-ghost"
+                    aria-label={`${document.filename} löschen`}
+                    onClick={() => onDelete(document)}
+                  >
+                    Löschen
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

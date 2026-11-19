@@ -8,7 +8,7 @@ import FolderActions from '../components/FolderActions.jsx'
 import FolderForm from '../components/FolderForm.jsx'
 import FolderTree from '../components/FolderTree.jsx'
 import Modal from '../components/Modal.jsx'
-import { getDocuments, searchDocuments, uploadDocument } from '../api/documentApi.js'
+import { deleteDocument, getDocuments, searchDocuments, uploadDocument } from '../api/documentApi.js'
 import { createFolder, deleteFolder, getFolders, updateFolder } from '../api/folderApi.js'
 import { useApiResource } from '../hooks/useApiResource.js'
 import { useDialog } from '../hooks/useDialog.js'
@@ -116,6 +116,18 @@ export default function DashboardPage() {
   }, [reloadDocuments, reloadSearch, searching])
 
   const [uploadNotice, setUploadNotice] = useState(null)
+  const [documentToDelete, setDocumentToDelete] = useState(null)
+
+  function askDeleteDocument(document) {
+    setDocumentToDelete(document)
+    dialog.open('deleteDocument')
+  }
+
+  const handleDeleteDocument = () =>
+    dialog.run(async () => {
+      await deleteDocument(documentToDelete.id)
+      reloadVisible()
+    })
 
   const handleUploadDocument = ({ file, folderId }) =>
     dialog.run(async () => {
@@ -162,6 +174,7 @@ export default function DashboardPage() {
         <DocumentTable
           documents={visibleDocuments}
           folderNames={folderNames}
+          onDelete={askDeleteDocument}
           emptyMessage={`Keine Treffer für ${query}`}
           emptyHint="Prüfe die Schreibweise oder versuche ein anderes Wort. Neue Dokumente sind erst durchsuchbar, wenn ihr Text erkannt wurde."
         />
@@ -173,6 +186,7 @@ export default function DashboardPage() {
       <DocumentTable
         documents={visibleDocuments}
         folderNames={folderNames}
+        onDelete={askDeleteDocument}
         emptyMessage={hasAnyDocument ? 'In diesem Ordner liegen noch keine Dokumente.' : 'Noch keine Dokumente.'}
         emptyHint={hasAnyDocument ? null : 'Lade dein erstes PDF über „PDF hochladen“ hoch, um loszulegen.'}
       />
@@ -320,6 +334,17 @@ export default function DashboardPage() {
           message={`Ordner „${selectedFolder.name}“ wirklich löschen?`}
           error={dialog.error}
           onConfirm={handleDeleteFolder}
+          onCancel={dialog.close}
+          busy={dialog.busy}
+        />
+      )}
+      {dialog.current === 'deleteDocument' && documentToDelete && (
+        <ConfirmDialog
+          title="Dokument löschen"
+          message={`Dokument „${documentToDelete.filename}“ und alle Kommentare wirklich löschen?`}
+          error={dialog.error}
+          onConfirm={handleDeleteDocument}
+          onCancel={dialog.close}
           busy={dialog.busy}
         />
       )}

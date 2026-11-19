@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import DashboardPage from './DashboardPage.jsx'
-import { getDocuments, searchDocuments, uploadDocument } from '../api/documentApi.js'
+import { deleteDocument, getDocuments, searchDocuments, uploadDocument } from '../api/documentApi.js'
 import { getFolders } from '../api/folderApi.js'
 
 vi.mock('../api/documentApi.js', () => ({
   getDocuments: vi.fn(),
   searchDocuments: vi.fn(),
   uploadDocument: vi.fn(),
+  deleteDocument: vi.fn(),
 }))
 vi.mock('../api/folderApi.js', () => ({
   getFolders: vi.fn(),
@@ -398,5 +399,87 @@ describe('DashboardPage Neuladen bei OCR_PENDING', () => {
     await advance(15000)
 
     expect(getDocuments).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('DashboardPage Dokument löschen', () => {
+  beforeEach(() => {
+    getDocuments.mockResolvedValue([hello, invoice])
+    getFolders.mockResolvedValue([])
+    searchDocuments.mockResolvedValue([hello])
+    deleteDocument.mockResolvedValue(null)
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+  })
+
+  it('zeigt pro Dokument einen Löschen-Button', async () => {
+    renderPage()
+    await screen.findByText('Rechnung.pdf')
+
+    expect(screen.getByRole('button', { name: 'HelloWorld.pdf löschen' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Rechnung.pdf löschen' })).toBeTruthy()
+  })
+
+  it('löscht nach Bestätigung und lädt die Liste neu', async () => {
+    renderPage()
+    await screen.findByText('Rechnung.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rechnung.pdf löschen' }))
+    const dialog = screen.getByRole('dialog', { name: 'Dokument löschen' })
+    expect(dialog.textContent).toContain('Rechnung.pdf')
+
+    getDocuments.mockResolvedValue([hello])
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+
+    await waitFor(() => expect(deleteDocument).toHaveBeenCalledWith('2'))
+    await waitFor(() => expect(screen.queryByText('Rechnung.pdf')).toBeNull())
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('löscht nichts, wenn der Dialog abgebrochen wird', async () => {
+    renderPage()
+    await screen.findByText('Rechnung.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rechnung.pdf löschen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(deleteDocument).not.toHaveBeenCalled()
+  })
+
+  it('schließt den Dialog mit Escape', async () => {
+    renderPage()
+    await screen.findByText('Rechnung.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rechnung.pdf löschen' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(deleteDocument).not.toHaveBeenCalled()
+  })
+
+  it('zeigt einen Fehler im Dialog, wenn das Löschen fehlschlägt', async () => {
+    deleteDocument.mockRejectedValue(new Error('Serverfehler'))
+    renderPage()
+    await screen.findByText('Rechnung.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rechnung.pdf löschen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+
+    await waitFor(() => expect(deleteDocument).toHaveBeenCalled())
+    expect(await screen.findByRole('dialog', { name: 'Dokument löschen' })).toBeTruthy()
+    expect(screen.getByText('Rechnung.pdf')).toBeTruthy()
+  })
+
+  it('bietet Löschen auch in den Suchtreffern an', async () => {
+    renderPage()
+    await screen.findByText('Rechnung.pdf')
+
+    search('Hello')
+    await waitFor(() => expect(screen.queryByText('Rechnung.pdf')).toBeNull())
+    expect(screen.getByRole('button', { name: 'HelloWorld.pdf löschen' })).toBeTruthy()
   })
 })
