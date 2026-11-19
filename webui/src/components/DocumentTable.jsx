@@ -3,9 +3,13 @@ import StatusBadge from './StatusBadge.jsx'
 import { formatDate } from '../utils/formatDate.js'
 import { formatSize } from '../utils/formatSize.js'
 
-export default function DocumentTable({ documents, folderNames = new Map() }) {
+export default function DocumentTable({
+  documents,
+  folderNames = new Map(),
+  emptyMessage = 'Keine Dokumente vorhanden.',
+}) {
   if (documents.length === 0) {
-    return <p className="empty">Keine Dokumente vorhanden.</p>
+    return <p className="empty">{emptyMessage}</p>
   }
 
   return (

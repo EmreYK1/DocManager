@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import DocumentCreateForm from '../components/DocumentCreateForm.jsx'
@@ -8,7 +8,7 @@ import FolderActions from '../components/FolderActions.jsx'
 import FolderForm from '../components/FolderForm.jsx'
 import FolderTree from '../components/FolderTree.jsx'
 import Modal from '../components/Modal.jsx'
-import { createDocument, getDocuments } from '../api/documentApi.js'
+import { createDocument, getDocuments, searchDocuments } from '../api/documentApi.js'
 import { createFolder, deleteFolder, getFolders, updateFolder } from '../api/folderApi.js'
 import { useApiResource } from '../hooks/useApiResource.js'
 import { useDialog } from '../hooks/useDialog.js'
@@ -24,8 +24,25 @@ function pageTitle(selectedFolder, folderParam) {
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const folderParam = searchParams.get('folder')
-  const [search, setSearch] = useState('')
+  // `searchInput` ist der Text im Feld, `query` der abgeschickte Suchbegriff.
+  const [searchInput, setSearchInput] = useState('')
+  const [query, setQuery] = useState('')
   const dialog = useDialog()
+
+  // Ergebnis trägt den Suchbegriff mit, damit Treffer einer älteren Suche nie angezeigt werden.
+  const loadSearch = useCallback(
+    () =>
+      query
+        ? searchDocuments(query).then((hits) => ({ query, hits }))
+        : Promise.resolve(null),
+    [query],
+  )
+  const {
+    data: searchResult,
+    loading: searchLoading,
+    error: searchError,
+    reload: reloadSearch,
+  } = useApiResource(loadSearch)
 
   const {
     data: documents,
@@ -50,10 +67,27 @@ export default function DashboardPage() {
     !allFolders.some((folder) => folder.parentId === selectedFolder.id) &&
     !documents.some((doc) => doc.folderId === selectedFolder.id)
 
+  const searching = query !== ''
+  const searchReady = searching && searchResult?.query === query
+  const sourceDocuments = searching ? (searchReady ? searchResult.hits : []) : (documents ?? [])
+
+  // Ordnerfilter gilt auch für Suchtreffer.
   const visibleDocuments = useMemo(
-    () => filterDocuments(documents ?? [], allFolders, folderParam, search),
-    [documents, allFolders, folderParam, search],
+    () => filterDocuments(sourceDocuments, allFolders, folderParam, ''),
+    [sourceDocuments, allFolders, folderParam],
   )
+
+  const handleSearch = (event) => {
+    event.preventDefault()
+    const next = searchInput.trim()
+    if (next === query && next !== '') reloadSearch()
+    setQuery(next)
+  }
+
+  const handleResetSearch = () => {
+    setSearchInput('')
+    setQuery('')
+  }
 
   const handleCreateFolder = (folder) =>
     dialog.run(async () => {
@@ -88,6 +122,7 @@ export default function DashboardPage() {
       <main className="content">
         <ErrorBanner error={documentsError} />
         <ErrorBanner error={foldersError} />
+        {searching && <ErrorBanner error={searchError} />}
 
         <div className="page-header">
           <div>
@@ -124,17 +159,37 @@ export default function DashboardPage() {
 
         <div className="card">
           <div className="card-toolbar">
-            <input
-              type="search"
-              className="search"
-              placeholder="Dokumente nach Dateiname filtern…"
-              aria-label="Dokumente filtern"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
+            <form className="search-form" role="search" onSubmit={handleSearch}>
+              <input
+                type="search"
+                className="search"
+                placeholder="Volltextsuche in Dokumenten…"
+                aria-label="Dokumente durchsuchen"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+              />
+              <button type="submit" className="btn btn-primary">
+                Suchen
+              </button>
+              {searching && (
+                <button type="button" className="btn" onClick={handleResetSearch}>
+                  Suche zurücksetzen
+                </button>
+              )}
+            </form>
             <span className="muted small">{visibleDocuments.length} Dokument(e)</span>
           </div>
-          {(documentsLoading || foldersLoading) && !documents ? (
+          {searching ? (
+            searchError ? null : !searchReady || searchLoading ? (
+              <p className="empty">Suche läuft…</p>
+            ) : (
+              <DocumentTable
+                documents={visibleDocuments}
+                folderNames={folderNames}
+                emptyMessage={`Keine Treffer für ${query}`}
+              />
+            )
+          ) : (documentsLoading || foldersLoading) && !documents ? (
             <p className="empty">Lade…</p>
           ) : (
             <DocumentTable documents={visibleDocuments} folderNames={folderNames} />

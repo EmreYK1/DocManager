@@ -11,3 +11,6 @@ export const deleteDocument = (id) => request(`/documents/${id}`, { method: 'DEL
 
 export const createDocument = (document) =>
   request('/documents', { method: 'POST', body: JSON.stringify(document) })
+
+export const searchDocuments = (query) =>
+  request(`/documents/search?q=${encodeURIComponent(query)}`)
