@@ -26,6 +26,7 @@
     <modules>
         <module>document-service</module>
         <module>ocr-worker</module>
+        <module>indexing-worker</module>
     </modules>
 
     <properties>
