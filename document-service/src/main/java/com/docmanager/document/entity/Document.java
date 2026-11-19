@@ -39,13 +39,11 @@ public class Document {
     private DocumentStatus status;
 
     @ToString.Exclude
-    @Lob
-    @Column(name = "ocr_text")
+    @Column(name = "ocr_text", columnDefinition = "text")
     private String ocrText;
 
     @ToString.Exclude
-    @Lob
-    @Column(name = "summary")
+    @Column(name = "summary", columnDefinition = "text")
     private String summary;
 
     @ManyToOne(fetch = FetchType.LAZY)
