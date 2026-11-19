@@ -73,7 +73,7 @@ public class OcrListener {
             log.info("OCR-Nachricht empfangen für Dokument-ID: {}, Dateigröße: {} Bytes", message.documentId(), fileSize);
 
             // OCR durchführen
-            String text = ocrService.extractText(tempFile.toFile());
+            String text = ocrService.extractText(tempFile);
 
             // Erfolgreiches Ergebnis senden
             sendResult(new OcrResultMessage(

@@ -14,7 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,12 +66,12 @@ class OcrListenerTest {
         byte[] pdfContent = "%PDF-1.4 Hello World".getBytes(StandardCharsets.UTF_8);
         when(documentStore.loadDocument(objectKey)).thenAnswer(inv -> new ByteArrayInputStream(pdfContent));
 
-        AtomicReference<File> tempFileRef = new AtomicReference<>();
-        when(ocrService.extractText(any(File.class))).thenAnswer(inv -> {
-            File f = inv.getArgument(0);
+        AtomicReference<Path> tempFileRef = new AtomicReference<>();
+        when(ocrService.extractText(any(Path.class))).thenAnswer(inv -> {
+            Path f = inv.getArgument(0);
             tempFileRef.set(f);
             assertThat(f).exists();
-            assertThat(f.length()).isEqualTo(pdfContent.length);
+            assertThat(Files.size(f)).isEqualTo(pdfContent.length);
             return "Hello World";
         });
 
@@ -119,9 +120,9 @@ class OcrListenerTest {
         byte[] pdfContent = "%PDF-1.4 Test".getBytes(StandardCharsets.UTF_8);
         when(documentStore.loadDocument(objectKey)).thenAnswer(inv -> new ByteArrayInputStream(pdfContent));
 
-        AtomicReference<File> tempFileRef = new AtomicReference<>();
-        when(ocrService.extractText(any(File.class))).thenAnswer(inv -> {
-            File f = inv.getArgument(0);
+        AtomicReference<Path> tempFileRef = new AtomicReference<>();
+        when(ocrService.extractText(any(Path.class))).thenAnswer(inv -> {
+            Path f = inv.getArgument(0);
             tempFileRef.set(f);
             assertThat(f).exists();
             throw new OcrException("OCR-Erkennung fehlgeschlagen");

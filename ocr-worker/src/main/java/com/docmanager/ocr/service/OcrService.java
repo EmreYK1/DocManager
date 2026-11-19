@@ -2,21 +2,16 @@ package com.docmanager.ocr.service;
 
 import com.docmanager.ocr.exception.OcrException;
 
-import java.io.File;
+import java.nio.file.Path;
 
 public interface OcrService {
 
     /**
-     * Führt OCR auf der übergebenen Datei aus und liefert den extrahierten Text zurück.
+     * Führt OCR auf der übergebenen PDF-Datei aus und liefert den extrahierten Text zurück.
      *
-     * @param file die zu verarbeitende PDF- oder Bilddatei
-     * @return erkannter Text
-     * @throws OcrException bei Fehlern während der OCR-Verarbeitung
+     * @param pdf die zu verarbeitende PDF-Datei
+     * @return erkannter Text aller Seiten
+     * @throws OcrException bei Fehlern, Exit-Code ungleich 0 oder Timeout
      */
-    String extractText(File file) throws OcrException;
-
-    default String process(File file) throws OcrException {
-        return extractText(file);
-    }
+    String extractText(Path pdf) throws OcrException;
 }
-
