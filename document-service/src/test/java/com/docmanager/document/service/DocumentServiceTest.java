@@ -5,6 +5,7 @@ import com.docmanager.document.entity.DocumentStatus;
 import com.docmanager.document.entity.Folder;
 import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.NotFoundException;
+import com.docmanager.document.exception.SearchException;
 import com.docmanager.document.messaging.OcrRequestMessage;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.impl.DocumentServiceImpl;
@@ -41,6 +42,9 @@ class DocumentServiceTest {
 
     @Mock
     private StorageService storageService;
+
+    @Mock
+    private SearchIndexService searchIndexService;
 
     @InjectMocks
     private DocumentServiceImpl documentService;
@@ -339,5 +343,73 @@ class DocumentServiceTest {
 
         verify(storageService, never()).delete(any());
         verify(documentRepository, times(1)).deleteById(sampleId);
+    }
+
+    @Test
+    @DisplayName("delete() entfernt den Index-Eintrag")
+    void delete_removesIndexEntry() {
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
+
+        documentService.delete(sampleId);
+
+        verify(searchIndexService).delete(sampleId);
+    }
+
+    @Test
+    @DisplayName("delete() scheitert nicht, wenn das Löschen im Index fehlschlägt")
+    void delete_indexFailure_isIgnored() {
+        when(documentRepository.findById(sampleId)).thenReturn(Optional.of(sampleDoc));
+        doThrow(new SearchException("ES down", new RuntimeException())).when(searchIndexService).delete(sampleId);
+
+        assertThatCode(() -> documentService.delete(sampleId)).doesNotThrowAnyException();
+
+        verify(documentRepository).deleteById(sampleId);
+    }
+
+    // ─── search ──────────────────────────────────────────────────────────────
+
+    private Document docWithId(UUID id, String filename) {
+        Document d = new Document(filename, "application/pdf", 1L, null);
+        d.setId(id);
+        return d;
+    }
+
+    @Test
+    @DisplayName("search() liefert Dokumente in der Relevanz-Reihenfolge des Index")
+    void search_keepsRelevanceOrder() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        when(searchIndexService.search("Hello")).thenReturn(List.of(first, second));
+        // Datenbank liefert in anderer Reihenfolge
+        when(documentRepository.findAllById(List.of(first, second)))
+                .thenReturn(List.of(docWithId(second, "b.pdf"), docWithId(first, "a.pdf")));
+
+        List<Document> result = documentService.search("Hello");
+
+        assertThat(result).extracting(Document::getFilename).containsExactly("a.pdf", "b.pdf");
+    }
+
+    @Test
+    @DisplayName("search() überspringt IDs, die nicht mehr in der DB existieren")
+    void search_skipsIdsMissingInDb() {
+        UUID existing = UUID.randomUUID();
+        UUID deleted = UUID.randomUUID();
+        when(searchIndexService.search("Hello")).thenReturn(List.of(deleted, existing));
+        when(documentRepository.findAllById(List.of(deleted, existing)))
+                .thenReturn(List.of(docWithId(existing, "a.pdf")));
+
+        List<Document> result = documentService.search("Hello");
+
+        assertThat(result).extracting(Document::getId).containsExactly(existing);
+    }
+
+    @Test
+    @DisplayName("search() ohne Treffer liefert leere Liste und fragt die DB nicht")
+    void search_noHits_returnsEmptyList() {
+        when(searchIndexService.search("xyz")).thenReturn(List.of());
+
+        assertThat(documentService.search("xyz")).isEmpty();
+
+        verifyNoInteractions(documentRepository);
     }
 }

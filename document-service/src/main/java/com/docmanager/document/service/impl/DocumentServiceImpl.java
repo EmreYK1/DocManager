@@ -7,6 +7,7 @@ import com.docmanager.document.messaging.OcrRequestMessage;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.document.service.DocumentService;
 import com.docmanager.document.service.DocumentUpdate;
+import com.docmanager.document.service.SearchIndexService;
 import com.docmanager.document.service.StorageService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.AmqpException;
@@ -18,7 +19,11 @@ import org.springframework.stereotype.Service;
 import com.docmanager.document.service.FolderService;
 import com.docmanager.document.entity.Folder;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,6 +33,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final FolderService folderService;
     private final RabbitTemplate rabbitTemplate;
     private final StorageService storageService;
+    private final SearchIndexService searchIndexService;
     private final String exchange;
     private final String documentRoutingKey;
 
@@ -35,12 +41,14 @@ public class DocumentServiceImpl implements DocumentService {
                                FolderService folderService,
                                RabbitTemplate rabbitTemplate,
                                StorageService storageService,
+                               SearchIndexService searchIndexService,
                                @Value("${app.rabbitmq.exchange}") String exchange,
                                @Value("${app.rabbitmq.routing-key.document}") String documentRoutingKey) {
         this.documentRepository = documentRepository;
         this.folderService = folderService;
         this.rabbitTemplate = rabbitTemplate;
         this.storageService = storageService;
+        this.searchIndexService = searchIndexService;
         this.exchange = exchange;
         this.documentRoutingKey = documentRoutingKey;
     }
@@ -140,5 +148,25 @@ public class DocumentServiceImpl implements DocumentService {
         }
         documentRepository.deleteById(id);
         log.info("Dokument gelöscht: id={}", id);
+        try {
+            searchIndexService.delete(id);
+        } catch (Exception e) {
+            log.warn("Index-Eintrag für Dokument {} konnte nicht gelöscht werden", id, e);
+        }
+    }
+
+    @Override
+    public List<Document> search(String query) {
+        List<UUID> ids = searchIndexService.search(query);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Document> byId = documentRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Document::getId, Function.identity()));
+        // Reihenfolge der Relevanz beibehalten, IDs ohne Dokument in der DB überspringen
+        return ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .toList();
     }
 }

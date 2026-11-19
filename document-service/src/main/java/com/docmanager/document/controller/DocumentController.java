@@ -4,6 +4,7 @@ import com.docmanager.document.dto.DocumentRequest;
 import com.docmanager.document.dto.DocumentUpdateRequest;
 import com.docmanager.document.dto.DocumentResponse;
 import com.docmanager.document.exception.InvalidFileException;
+import com.docmanager.document.exception.InvalidQueryException;
 import com.docmanager.document.mapper.DocumentMapper;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.service.DocumentService;
@@ -45,6 +46,16 @@ public class DocumentController {
     public DocumentResponse create(@Valid @RequestBody DocumentRequest request) {
         Document document = documentService.create(request.getFilename(), request.getContentType(), request.getSizeBytes(), request.getFolderId());
         return DocumentMapper.toResponse(document);
+    }
+
+    @GetMapping("/search")
+    public List<DocumentResponse> search(@RequestParam(value = "q", required = false) String q) {
+        if (q == null || q.isBlank()) {
+            throw new InvalidQueryException("Der Suchbegriff darf nicht leer sein");
+        }
+        return documentService.search(q.trim()).stream()
+                .map(DocumentMapper::toResponse)
+                .toList();
     }
 
     @GetMapping("/{id}")

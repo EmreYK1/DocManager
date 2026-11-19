@@ -3,6 +3,7 @@ package com.docmanager.document.controller;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.entity.Folder;
 import com.docmanager.document.exception.GlobalExceptionHandler;
+import com.docmanager.document.exception.SearchException;
 import com.docmanager.document.service.DocumentService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -24,6 +26,7 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -152,6 +155,59 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.stackTrace").doesNotExist());
 
         verify(documentService, never()).upload(any(), any());
+    }
+
+    // ─── search ──────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("GET /documents/search?q=Hello → 200 mit Trefferliste")
+    void search_returnsMatchingDocuments() throws Exception {
+        Document doc = new Document("HelloWorld.pdf", "application/pdf", 10L, null);
+        doc.setId(UUID.randomUUID());
+        when(documentService.search("Hello")).thenReturn(List.of(doc));
+
+        mockMvc.perform(get("/documents/search").param("q", "Hello"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].filename").value("HelloWorld.pdf"));
+    }
+
+    @Test
+    @DisplayName("GET /documents/search ohne Treffer → 200 mit leerer Liste")
+    void search_noHits_returnsEmptyList() throws Exception {
+        when(documentService.search("xyz")).thenReturn(List.of());
+
+        mockMvc.perform(get("/documents/search").param("q", "xyz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /documents/search?q= (leer) → 400")
+    void search_emptyQuery_returns400() throws Exception {
+        mockMvc.perform(get("/documents/search").param("q", ""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        verify(documentService, never()).search(any());
+    }
+
+    @Test
+    @DisplayName("GET /documents/search ohne q → 400")
+    void search_missingQuery_returns400() throws Exception {
+        mockMvc.perform(get("/documents/search"))
+                .andExpect(status().isBadRequest());
+
+        verify(documentService, never()).search(any());
+    }
+
+    @Test
+    @DisplayName("GET /documents/search bei Elasticsearch-Ausfall → 503")
+    void search_elasticsearchDown_returns503() throws Exception {
+        when(documentService.search("Hello")).thenThrow(new SearchException("down", new RuntimeException()));
+
+        mockMvc.perform(get("/documents/search").param("q", "Hello"))
+                .andExpect(status().isServiceUnavailable());
     }
 }
 

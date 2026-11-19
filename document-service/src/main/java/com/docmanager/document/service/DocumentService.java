@@ -19,4 +19,9 @@ public interface DocumentService {
     Document update(UUID id, DocumentUpdate update);
 
     void delete(UUID id);
+
+    /**
+     * Sucht Dokumente per Elasticsearch, nach Relevanz sortiert.
+     */
+    List<Document> search(String query);
 }

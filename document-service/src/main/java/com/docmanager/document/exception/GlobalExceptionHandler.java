@@ -63,6 +63,21 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidQueryException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidQuery(InvalidQueryException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(SearchException.class)
+    public ResponseEntity<ErrorResponse> handleSearch(SearchException ex) {
+        log.error("Such-Fehler", ex);
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse(HttpStatus.SERVICE_UNAVAILABLE.value(), "Suche derzeit nicht verfügbar"));
+    }
+
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ErrorResponse> handleMissingServletRequestPart(MissingServletRequestPartException ex) {
         log.warn("Erforderlicher Request-Teil fehlt: {}", ex.getMessage());

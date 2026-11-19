@@ -52,12 +52,15 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: documents
+      ELASTICSEARCH_URL: http://elasticsearch:9200
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
 
   ocr-worker:
