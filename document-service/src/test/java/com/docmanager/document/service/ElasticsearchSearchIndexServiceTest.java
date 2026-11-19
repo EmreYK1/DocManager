@@ -36,6 +36,24 @@ class ElasticsearchSearchIndexServiceTest {
     }
 
     @Test
+    @DisplayName("buildQuery: Fuzzy-Suche plus Teilstring-Suche im Dateinamen, damit 'helloworld' HelloWorld.pdf findet")
+    void buildQuery_combinesFuzzyAndFilenameWildcard() {
+        String json = ElasticsearchSearchIndexService.buildQuery("helloworld").toString();
+
+        assertThat(json).contains("multi_match").contains("\"fuzziness\":\"AUTO\"");
+        assertThat(json).contains("wildcard").contains("*helloworld*").contains("\"case_insensitive\":true");
+    }
+
+    @Test
+    @DisplayName("buildQuery: jedes Wort bekommt eigene Teilstring-Suche, Sonderzeichen werden maskiert")
+    void buildQuery_perTermWildcards_andEscaping() {
+        String json = ElasticsearchSearchIndexService.buildQuery("hello wor*ld a").toString();
+
+        assertThat(json).contains("*hello*").contains("*wor\\\\*ld*");
+        assertThat(json).doesNotContain("\"*a*\"");
+    }
+
+    @Test
     @DisplayName("search() bei nicht erreichbarem Elasticsearch → SearchException")
     void search_unreachable_throwsSearchException() {
         assertThatThrownBy(() -> service.search("Hello")).isInstanceOf(SearchException.class);

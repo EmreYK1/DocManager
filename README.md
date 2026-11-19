@@ -10,7 +10,7 @@ Eine webbasierte Anwendung zum Verwalten von Dokumenten. Dokumente werden in bel
 
 ## Überblick
 
-DocManager besteht aus drei Containern: einer PostgreSQL-Datenbank, dem Spring-Boot-Backend und einem nginx, der die React-Oberfläche ausliefert und Anfragen an `/api` an das Backend weiterreicht. Die Oberfläche greift ausschließlich über diese REST-API auf die Daten zu.
+DocManager besteht aus mehreren Containern: Weboberfläche, REST-Backend, zwei Workern für Texterkennung und Suchindex sowie PostgreSQL, MinIO, RabbitMQ und Elasticsearch. Welche das sind und wofür sie da sind, steht unter [Was wird gestartet?](#was-wird-gestartet). Die Oberfläche greift ausschließlich über die REST-API auf die Daten zu.
 
 Aktuell werden die Metadaten der Dokumente verwaltet, die Dateien selbst werden noch nicht gespeichert (siehe [Einschränkungen](#einschränkungen)). Das Datenmodell ist aber schon auf spätere Erweiterungen wie OCR-Text und Zusammenfassung vorbereitet.
 
@@ -42,16 +42,37 @@ cd DocManager
 Projekt starten:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-Beim ersten Start werden alle Container gebaut. Die Tabellen legt das Backend selbst an, eine Konfiguration ist nicht nötig.
+`-d` startet alles im Hintergrund. Ohne `-d` schreiben alle Dienste ihre Logs gleichzeitig ins Terminal, das sind schnell mehrere tausend Zeilen. Beim ersten Start werden die Images gebaut, das dauert einige Minuten. Danach zeigt `docker compose ps`, ob alles läuft. Die Weboberfläche startet erst, wenn das Backend bereit ist.
 
-Anwendung öffnen:
+### Was wird gestartet?
 
-- Weboberfläche: http://localhost
-- REST-API: http://localhost:8080
-- PostgreSQL: `localhost:5432` (Datenbank, Benutzer und Passwort jeweils `docmanager`)
+| Dienst | Aufgabe | Im Browser |
+|---|---|---|
+| `webui` | Weboberfläche (React + nginx), leitet `/api` ans Backend weiter | http://localhost |
+| `document-service` | REST-Backend: Dokumente, Ordner, Kommentare, Upload, Suche | nur über http://localhost/api |
+| `ocr-worker` | Liest den Text aus hochgeladenen PDFs (Ghostscript + Tesseract) | – |
+| `indexing-worker` | Schreibt den erkannten Text in den Suchindex | – |
+| `db` | PostgreSQL für Metadaten, Ordner und Kommentare | `localhost:5432` (`docmanager` / `docmanager`) |
+| `minio` | Speicher für die PDF-Dateien | http://localhost:9090 (`minioadmin` / `minioadmin`) |
+| `rabbitmq` | Nachrichten zwischen Backend und Workern | http://localhost:15672 (`guest` / `guest`) |
+| `elasticsearch` | Volltextsuche | http://localhost:9200 |
+| `kibana` | Optional, nur mit `docker compose --profile tools up -d` | http://localhost:5601 |
+
+Ablauf eines Uploads: Weboberfläche → `document-service` speichert die Datei in MinIO und die Metadaten in PostgreSQL → RabbitMQ → `ocr-worker` erkennt den Text → RabbitMQ → `indexing-worker` schreibt ihn nach Elasticsearch, der `document-service` speichert ihn in der Datenbank.
+
+Nützliche Befehle:
+
+```bash
+docker compose ps                        # Welche Dienste laufen, sind sie gesund?
+docker compose logs -f document-service  # Logs eines einzelnen Dienstes verfolgen
+docker compose down                      # Alles stoppen (Daten bleiben erhalten)
+docker compose down -v                   # Alles stoppen und alle Daten löschen
+```
+
+Läuft auf dem Rechner bereits ein eigenes PostgreSQL auf Port 5432, verbinden sich lokal gestartete Tests mit diesem statt mit dem Container. Dann das lokale PostgreSQL stoppen oder `DB_URL` auf einen anderen Port setzen.
 
 ### Erste Schritte
 

@@ -1,40 +1,30 @@
+# DocManager – alle Dienste
+#
+#   docker compose up -d --build     startet die App im Hintergrund (empfohlen)
+#   docker compose ps                zeigt, welche Dienste laufen und ob sie gesund sind
+#   docker compose logs -f <dienst>  zeigt die Logs eines Dienstes, z. B. document-service
+#   docker compose --profile tools up -d   startet zusätzlich Kibana (Elasticsearch-Oberfläche)
+#
+# Ablauf: Web-UI → document-service (REST) → speichert PDF in MinIO, Metadaten in Postgres
+#         → RabbitMQ → ocr-worker (Texterkennung) → RabbitMQ → indexing-worker → Elasticsearch
+name: docmanager
+
 services:
-  db:
-    image: postgres:17
-    container_name: docmanager-db
-    environment:
-      POSTGRES_DB: docmanager
-      POSTGRES_USER: docmanager
-      POSTGRES_PASSWORD: docmanager
-    ports:
-      - "5432:5432"
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U docmanager -d docmanager"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+  # ─── Anwendung ──────────────────────────────────────────────────────────────
 
-  minio:
-    # minio/minio ist öffentlich nicht mehr pullbar → Chainguard-Ersatz
-    image: cgr.dev/chainguard/minio:latest
-    container_name: docmanager-minio
-    command: server /data --console-address ":9090"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+  # Weboberfläche (React, ausgeliefert von nginx). Leitet /api an den document-service weiter.
+  webui:
+    build:
+      context: ./webui
+    container_name: docmanager-webui
     ports:
-      - "9000:9000"
-      - "9090:9090"
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      - "80:80"            # http://localhost
+    depends_on:
+      document-service:
+        condition: service_healthy
 
+  # REST-Backend (Spring Boot): Dokumente, Ordner, Kommentare, Upload, Suche.
+  # Nicht direkt von außen erreichbar, nur über die Web-UI unter /api.
   document-service:
     build:
       context: .
@@ -53,6 +43,13 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: documents
       ELASTICSEARCH_URL: http://elasticsearch:9200
+    healthcheck:
+      # Gesund, sobald der Webserver auf Port 8080 Verbindungen annimmt
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
     depends_on:
       db:
         condition: service_healthy
@@ -63,6 +60,7 @@ services:
       elasticsearch:
         condition: service_healthy
 
+  # Liest den Text aus hochgeladenen PDFs (Ghostscript + Tesseract).
   ocr-worker:
     build:
       context: .
@@ -83,6 +81,7 @@ services:
       minio:
         condition: service_healthy
 
+  # Schreibt den erkannten Text in Elasticsearch, damit er durchsuchbar wird.
   indexing-worker:
     build:
       context: .
@@ -100,15 +99,47 @@ services:
       elasticsearch:
         condition: service_healthy
 
-  webui:
-    build:
-      context: ./webui
-    container_name: docmanager-webui
-    ports:
-      - "80:80"
-    depends_on:
-      - document-service
+  # ─── Infrastruktur ──────────────────────────────────────────────────────────
 
+  # Datenbank für Metadaten, Ordner und Kommentare.
+  db:
+    image: postgres:17
+    container_name: docmanager-db
+    environment:
+      POSTGRES_DB: docmanager
+      POSTGRES_USER: docmanager
+      POSTGRES_PASSWORD: docmanager
+    ports:
+      - "5432:5432"        # für lokale Entwicklung ohne Docker
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docmanager -d docmanager"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Speicher für die PDF-Dateien selbst.
+  minio:
+    # minio/minio ist öffentlich nicht mehr pullbar → Chainguard-Ersatz
+    image: cgr.dev/chainguard/minio:latest
+    container_name: docmanager-minio
+    command: server /data --console-address ":9090"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"        # S3-API
+      - "9090:9090"        # MinIO-Konsole: http://localhost:9090 (minioadmin / minioadmin)
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Nachrichten-Queue zwischen Backend und Workern.
   rabbitmq:
     image: rabbitmq:3-management
     container_name: docmanager-rabbitmq
@@ -116,8 +147,8 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672:5672"        # AMQP
+      - "15672:15672"      # Verwaltung: http://localhost:15672 (guest / guest)
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -126,6 +157,7 @@ services:
       timeout: 5s
       retries: 10
 
+  # Suchmaschine für die Volltextsuche.
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
     container_name: docmanager-elasticsearch
@@ -134,7 +166,7 @@ services:
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: -Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "9200:9200"        # http://localhost:9200
     volumes:
       - es-data:/usr/share/elasticsearch/data
     healthcheck:
@@ -144,9 +176,13 @@ services:
       retries: 20
       start_period: 30s
 
+  # ─── Optionale Werkzeuge (nur mit --profile tools) ──────────────────────────
+
+  # Oberfläche zum Ansehen des Suchindex: http://localhost:5601
   kibana:
     image: docker.elastic.co/kibana/kibana:8.15.0
     container_name: docmanager-kibana
+    profiles: ["tools"]
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     ports:
@@ -154,7 +190,6 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
-
 
 volumes:
   db-data:

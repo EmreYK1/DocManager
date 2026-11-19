@@ -12,5 +12,9 @@ RUN mvn -B -q -pl indexing-worker -am package -DskipTests
 
 FROM eclipse-temurin:25-jre
 WORKDIR /app
+
+# Nicht als root laufen
+RUN groupadd --system app && useradd --system --gid app --no-create-home app
 COPY --from=build /build/indexing-worker/target/indexing-worker-*.jar app.jar
+USER app
 ENTRYPOINT ["java", "-jar", "app.jar"]

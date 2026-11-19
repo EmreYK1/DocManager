@@ -3,6 +3,7 @@ package com.docmanager.document.controller;
 import com.docmanager.document.dto.DocumentRequest;
 import com.docmanager.document.dto.DocumentUpdateRequest;
 import com.docmanager.document.dto.DocumentResponse;
+import com.docmanager.document.dto.DocumentSummaryResponse;
 import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.InvalidQueryException;
 import com.docmanager.document.mapper.DocumentMapper;
@@ -49,12 +50,12 @@ public class DocumentController {
     }
 
     @GetMapping("/search")
-    public List<DocumentResponse> search(@RequestParam(value = "q", required = false) String q) {
+    public List<DocumentSummaryResponse> search(@RequestParam(value = "q", required = false) String q) {
         if (q == null || q.isBlank()) {
             throw new InvalidQueryException("Der Suchbegriff darf nicht leer sein");
         }
         return documentService.search(q.trim()).stream()
-                .map(DocumentMapper::toResponse)
+                .map(DocumentMapper::toSummary)
                 .toList();
     }
 
@@ -64,9 +65,9 @@ public class DocumentController {
     }
 
     @GetMapping
-    public List<DocumentResponse> getAll() {
+    public List<DocumentSummaryResponse> getAll() {
         return documentService.findAll().stream()
-                .map(DocumentMapper::toResponse)
+                .map(DocumentMapper::toSummary)
                 .toList();
     }
 

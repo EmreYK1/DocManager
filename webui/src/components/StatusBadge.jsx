@@ -1,11 +1,11 @@
-const TONES = {
-  UPLOADED: 'info',
-  OCR_PENDING: 'warn',
-  OCR_DONE: 'ok',
-  SUMMARY_DONE: 'ok',
-  FAILED: 'danger',
-}
+import { statusInfo } from '../constants/documentStatus.js'
 
 export default function StatusBadge({ status }) {
-  return <span className={`badge badge-${TONES[status] ?? 'info'}`}>{status}</span>
+  const { label, tone, description } = statusInfo(status)
+  return (
+    <span className={`badge badge-${tone}`} title={description}>
+      {status === 'OCR_PENDING' && <span className="spinner" aria-hidden="true" />}
+      {label}
+    </span>
+  )
 }

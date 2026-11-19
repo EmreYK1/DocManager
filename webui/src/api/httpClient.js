@@ -24,9 +24,13 @@ async function readErrorBody(response) {
 export async function request(path, options = {}) {
   let response
   try {
+    // Bei FormData setzt der Browser den Content-Type selbst (inkl. Trennmarke zwischen den Teilen).
+    const { headers: customHeaders, ...rest } = options
+    const defaultHeaders = rest.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }
     response = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
+      ...rest,
+      // Eigene Header ergänzen die Standard-Header, statt sie zu ersetzen.
+      headers: { ...defaultHeaders, ...customHeaders },
     })
   } catch {
     throw new ApiError(0, 'Netzwerkfehler')

@@ -7,9 +7,15 @@ export default function DocumentTable({
   documents,
   folderNames = new Map(),
   emptyMessage = 'Keine Dokumente vorhanden.',
+  emptyHint = null,
 }) {
   if (documents.length === 0) {
-    return <p className="empty">{emptyMessage}</p>
+    return (
+      <div className="empty">
+        <p className="empty-title">{emptyMessage}</p>
+        {emptyHint && <p className="empty-hint">{emptyHint}</p>}
+      </div>
+    )
   }
 
   return (
@@ -21,7 +27,7 @@ export default function DocumentTable({
             <th>Status</th>
             <th>Ordner</th>
             <th>Größe</th>
-            <th>Upload-Datum</th>
+            <th>Hochgeladen am</th>
           </tr>
         </thead>
         <tbody>

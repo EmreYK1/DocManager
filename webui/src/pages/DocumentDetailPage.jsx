@@ -7,11 +7,13 @@ import DocumentEditForm from '../components/DocumentEditForm.jsx'
 import DocumentMetadata from '../components/DocumentMetadata.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 import Modal from '../components/Modal.jsx'
+import RecognizedText from '../components/RecognizedText.jsx'
 import { deleteDocument, getDocument, updateDocument } from '../api/documentApi.js'
 import { createComment, deleteComment, getComments, updateComment } from '../api/commentApi.js'
 import { getFolders } from '../api/folderApi.js'
 import { useApiResource } from '../hooks/useApiResource.js'
 import { useDialog } from '../hooks/useDialog.js'
+import { useOcrPolling } from '../hooks/useOcrPolling.js'
 import { buildFolderNameMap } from '../utils/folderNames.js'
 
 export default function DocumentDetailPage() {
@@ -33,6 +35,14 @@ export default function DocumentDetailPage() {
     reload: reloadComments,
   } = useApiResource(loadComments)
   const { data: folders } = useApiResource(getFolders)
+
+  // Während der Texterkennung neu laden, damit Status und erkannter Text ohne F5 erscheinen.
+  useOcrPolling({
+    active: document?.status === 'OCR_PENDING',
+    busy: documentLoading,
+    failed: Boolean(documentError),
+    reload: reloadDocument,
+  })
 
   const dialog = useDialog()
   const [commentToDelete, setCommentToDelete] = useState(null)
@@ -83,9 +93,9 @@ export default function DocumentDetailPage() {
   return (
     <main className="content content-narrow">
       <p className="breadcrumb">
-        <Link to="/">← Alle Dokumente</Link>
+        <Link to="/">← Zurück zur Übersicht</Link>
       </p>
-      {(documentLoading || commentsLoading) && !document && <p className="empty">Lade…</p>}
+      {(documentLoading || commentsLoading) && !document && <p className="empty">Dokument wird geladen…</p>}
       <ErrorBanner error={documentError} />
       <ErrorBanner error={commentsError} />
 
@@ -105,6 +115,11 @@ export default function DocumentDetailPage() {
           <div className="card card-padded">
             <DocumentMetadata document={document} folderName={folderNames.get(document.folderId) ?? '–'} />
           </div>
+
+          <h2 className="section-title">Erkannter Text</h2>
+          <div className="card card-padded">
+            <RecognizedText status={document.status} text={document.ocrText} />
+          </div>
         </>
       )}
 
@@ -119,9 +134,15 @@ export default function DocumentDetailPage() {
       </div>
 
       {dialog.current === 'edit' && document && (
-        <Modal title="Dokument bearbeiten" onClose={dialog.close}>
+        <Modal title="Dokument bearbeiten" onClose={dialog.close} busy={dialog.busy}>
           <ErrorBanner error={dialog.error} />
-          <DocumentEditForm document={document} folders={folders ?? []} onSave={handleSave} onCancel={dialog.close} />
+          <DocumentEditForm
+            document={document}
+            folders={folders ?? []}
+            onSave={handleSave}
+            onCancel={dialog.close}
+            busy={dialog.busy}
+          />
         </Modal>
       )}
       {dialog.current === 'delete' && document && (
@@ -130,7 +151,7 @@ export default function DocumentDetailPage() {
           message={`Dokument „${document.filename}“ und alle Kommentare wirklich löschen?`}
           error={dialog.error}
           onConfirm={handleDelete}
-          onCancel={dialog.close}
+          busy={dialog.busy}
         />
       )}
       {dialog.current === 'deleteComment' && commentToDelete && (
@@ -139,7 +160,7 @@ export default function DocumentDetailPage() {
           message="Diesen Kommentar wirklich löschen?"
           error={dialog.error}
           onConfirm={handleCommentDelete}
-          onCancel={dialog.close}
+          busy={dialog.busy}
         />
       )}
     </main>

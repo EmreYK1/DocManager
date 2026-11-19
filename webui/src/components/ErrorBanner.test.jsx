@@ -19,7 +19,7 @@ describe('ErrorBanner', () => {
     render(<ErrorBanner error={error} />)
 
     const alert = screen.getByRole('alert')
-    expect(alert.textContent).toContain('Eingabe ungültig')
+    expect(alert.textContent).toContain('Die Eingabe ist ungültig')
     expect(screen.getByText('Kommentarinhalt darf maximal 2000 Zeichen lang sein')).toBeTruthy()
     expect(alert.querySelectorAll('li')).toHaveLength(1)
   })
@@ -27,7 +27,7 @@ describe('ErrorBanner', () => {
   it('zeigt nur die Statusmeldung ohne fields', () => {
     render(<ErrorBanner error={new ApiError(500, 'Boom')} />)
 
-    expect(screen.getByRole('alert').textContent).toBe('Serverfehler, bitte später erneut versuchen')
+    expect(screen.getByRole('alert').textContent).toBe('Da ist etwas schiefgelaufen. Bitte versuche es später noch einmal.')
     expect(screen.queryByRole('list')).toBeNull()
   })
 })

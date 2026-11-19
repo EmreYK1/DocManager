@@ -1,3 +1,13 @@
+# Build-Kontext klein halten: Die Java-Images bauen aus dem Projekt-Root,
+# brauchen aber nur die pom.xml-Dateien und den jeweiligen src-Ordner.
 **/target/
+**/node_modules/
+**/dist/
 .git/
+.github/
 .idea/
+.vscode/
+**/.DS_Store
+docs/
+Bewerbungen/
+*.md

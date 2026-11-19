@@ -20,6 +20,41 @@ describe('request', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/documents')
   })
 
+  it('setzt bei JSON-Bodies den Content-Type application/json', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
+
+    await request('/documents', { method: 'POST', body: JSON.stringify({ a: 1 }) })
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('setzt bei FormData keinen Content-Type, damit der Browser die Trennmarke ergänzt', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
+    const body = new FormData()
+    body.append('file', new File(['x'], 'a.pdf', { type: 'application/pdf' }))
+
+    await request('/documents/upload', { method: 'POST', body })
+
+    const options = fetchMock.mock.calls[0][1]
+    expect(options.body).toBe(body)
+    expect(options.headers['Content-Type']).toBeUndefined()
+  })
+
+  it('ergänzt eigene Header, statt den Content-Type zu verlieren', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
+
+    await request('/documents', {
+      method: 'POST',
+      body: '{}',
+      headers: { Accept: 'application/json' },
+    })
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    })
+  })
+
   it('liefert null bei Status 204', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 

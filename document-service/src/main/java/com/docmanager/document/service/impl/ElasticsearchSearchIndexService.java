@@ -1,7 +1,9 @@
 package com.docmanager.document.service.impl;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MultiMatchQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.docmanager.document.exception.SearchException;
@@ -20,6 +22,7 @@ import java.util.UUID;
 public class ElasticsearchSearchIndexService implements SearchIndexService {
 
     private static final int MAX_HITS = 100;
+    private static final int MIN_WILDCARD_TERM_LENGTH = 2;
 
     private final ElasticsearchClient client;
     private final String indexName;
@@ -36,10 +39,7 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
             SearchResponse<Void> response = client.search(s -> s
                             .index(indexName)
                             .size(MAX_HITS)
-                            .query(q -> q.multiMatch(MultiMatchQuery.of(m -> m
-                                    .query(query)
-                                    .fields("content", "filename")
-                                    .fuzziness("AUTO")))),
+                            .query(buildQuery(query)),
                     Void.class);
             return response.hits().hits().stream()
                     .map(Hit::id)
@@ -49,6 +49,34 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
         } catch (IOException | RuntimeException e) {
             throw new SearchException("Suche in Elasticsearch fehlgeschlagen", e);
         }
+    }
+
+    /**
+     * Fuzzy-Suche auf Inhalt und Dateiname (findet auch Tippfehler) plus Teilstring-Suche im
+     * Dateinamen. Letztere ist nötig, weil Elasticsearch „HelloWorld.pdf“ als EIN Wort
+     * („helloworld.pdf“) indexiert und „helloworld“ sonst zu weit davon entfernt wäre.
+     */
+    public static Query buildQuery(String query) {
+        BoolQuery.Builder bool = new BoolQuery.Builder()
+                .minimumShouldMatch("1")
+                .should(s -> s.multiMatch(MultiMatchQuery.of(m -> m
+                        .query(query)
+                        .fields("content", "filename")
+                        .fuzziness("AUTO"))));
+        for (String term : query.trim().split("\\s+")) {
+            if (term.length() >= MIN_WILDCARD_TERM_LENGTH) {
+                String pattern = "*" + escapeWildcard(term) + "*";
+                bool.should(s -> s.wildcard(w -> w
+                        .field("filename")
+                        .value(pattern)
+                        .caseInsensitive(true)));
+            }
+        }
+        return Query.of(q -> q.bool(bool.build()));
+    }
+
+    private static String escapeWildcard(String term) {
+        return term.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?");
     }
 
     @Override

@@ -75,3 +75,15 @@ tbody tr:hover {
   text-align: center;
   color: var(--muted);
 }
+
+.empty-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-hint {
+  margin: 0.4rem auto 0;
+  max-width: 32rem;
+  font-size: 0.9rem;
+}

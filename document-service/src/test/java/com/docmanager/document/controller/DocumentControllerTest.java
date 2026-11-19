@@ -173,6 +173,30 @@ class DocumentControllerTest {
     }
 
     @Test
+    @DisplayName("Liste und Suche enthalten keinen OCR-Text, die Detailansicht schon")
+    void listAndSearch_omitOcrText_detailIncludesIt() throws Exception {
+        Document doc = new Document("HelloWorld.pdf", "application/pdf", 10L, null);
+        UUID id = UUID.randomUUID();
+        doc.setId(id);
+        doc.setOcrText("Hello World");
+        doc.setSummary("Eine Zusammenfassung");
+        when(documentService.findAll()).thenReturn(List.of(doc));
+        when(documentService.search("Hello")).thenReturn(List.of(doc));
+        when(documentService.findById(id)).thenReturn(doc);
+
+        mockMvc.perform(get("/documents"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].filename").value("HelloWorld.pdf"))
+                .andExpect(jsonPath("$[0].ocrText").doesNotExist())
+                .andExpect(jsonPath("$[0].summary").doesNotExist());
+        mockMvc.perform(get("/documents/search").param("q", "Hello"))
+                .andExpect(jsonPath("$[0].ocrText").doesNotExist());
+        mockMvc.perform(get("/documents/" + id))
+                .andExpect(jsonPath("$.ocrText").value("Hello World"))
+                .andExpect(jsonPath("$.summary").value("Eine Zusammenfassung"));
+    }
+
+    @Test
     @DisplayName("GET /documents/search ohne Treffer → 200 mit leerer Liste")
     void search_noHits_returnsEmptyList() throws Exception {
         when(documentService.search("xyz")).thenReturn(List.of());

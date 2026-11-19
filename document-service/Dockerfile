@@ -12,6 +12,10 @@ RUN mvn -B -q -pl document-service -am package -DskipTests
 
 FROM eclipse-temurin:25-jre
 WORKDIR /app
+
+# Nicht als root laufen
+RUN groupadd --system app && useradd --system --gid app --no-create-home app
 COPY --from=build /build/document-service/target/document-service-*.jar app.jar
 EXPOSE 8080
+USER app
 ENTRYPOINT ["java", "-jar", "app.jar"]

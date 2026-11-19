@@ -11,6 +11,7 @@ export default function FolderForm({
   excludeIds,
   submitLabel = 'Ordner anlegen',
   onCancel,
+  busy = false,
 }) {
   const name = useTextField('Ordnername', initial.name)
   const [parentId, setParentId] = useState(initial.parentId ?? '')
@@ -38,11 +39,11 @@ export default function FolderForm({
       />
       <div className="form-actions">
         {onCancel && (
-          <button type="button" className="btn" onClick={onCancel}>
+          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
             Abbrechen
           </button>
         )}
-        <button type="submit" className="btn btn-primary" disabled={Boolean(name.error)}>
+        <button type="submit" className="btn btn-primary" disabled={Boolean(name.error) || busy}>
           {submitLabel}
         </button>
       </div>
