@@ -1,6 +1,6 @@
 package com.docmanager.genai.service.impl;
 
-import com.docmanager.genai.exception.SummaryException;
+import com.docmanager.genai.exception.GenAiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -81,7 +81,7 @@ class GeminiSummaryServiceTest {
         server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
 
         assertThatThrownBy(() -> service.summarize("Text"))
-                .isInstanceOf(SummaryException.class)
+                .isInstanceOf(GenAiException.class)
                 .hasMessageContaining("429");
     }
 
@@ -90,7 +90,7 @@ class GeminiSummaryServiceTest {
         server.expect(requestTo(URL)).andRespond(withException(new IOException("timeout")));
 
         assertThatThrownBy(() -> service.summarize("Text"))
-                .isInstanceOf(SummaryException.class)
+                .isInstanceOf(GenAiException.class)
                 .hasMessageContaining("nicht erreichbar");
     }
 
@@ -100,7 +100,7 @@ class GeminiSummaryServiceTest {
                 {"promptFeedback": {"blockReason": "SAFETY"}}""");
 
         assertThatThrownBy(() -> service.summarize("Text"))
-                .isInstanceOf(SummaryException.class)
+                .isInstanceOf(GenAiException.class)
                 .hasMessageContaining("SAFETY");
     }
 
@@ -110,7 +110,7 @@ class GeminiSummaryServiceTest {
                 {"candidates": [{"finishReason": "MAX_TOKENS", "content": {"parts": [{"text": "Halb"}]}}]}""");
 
         assertThatThrownBy(() -> service.summarize("Text"))
-                .isInstanceOf(SummaryException.class)
+                .isInstanceOf(GenAiException.class)
                 .hasMessageContaining("MAX_TOKENS");
     }
 
@@ -120,7 +120,7 @@ class GeminiSummaryServiceTest {
                 {"candidates": [{"finishReason": "STOP", "content": {}}]}""");
 
         assertThatThrownBy(() -> service.summarize("Text"))
-                .isInstanceOf(SummaryException.class)
+                .isInstanceOf(GenAiException.class)
                 .hasMessageContaining("leere Antwort");
     }
 
@@ -129,7 +129,7 @@ class GeminiSummaryServiceTest {
         GeminiSummaryService withoutKey = new GeminiSummaryService(restClient, " ", "test-model", 20);
 
         assertThatThrownBy(() -> withoutKey.summarize("Text")).hasMessageContaining("GEMINI_API_KEY");
-        assertThatThrownBy(() -> service.summarize("  ")).isInstanceOf(SummaryException.class);
+        assertThatThrownBy(() -> service.summarize("  ")).isInstanceOf(GenAiException.class);
         server.verify();
     }
 

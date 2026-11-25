@@ -1,6 +1,6 @@
 package com.docmanager.genai.service.impl;
 
-import com.docmanager.genai.exception.SummaryException;
+import com.docmanager.genai.exception.GenAiException;
 import com.docmanager.genai.service.SummaryService;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -49,10 +49,10 @@ public class GeminiSummaryService implements SummaryService {
     @Override
     public String summarize(String text) {
         if (apiKey.isBlank()) {
-            throw new SummaryException("GEMINI_API_KEY ist nicht gesetzt");
+            throw new GenAiException("GEMINI_API_KEY ist nicht gesetzt");
         }
         if (text == null || text.isBlank()) {
-            throw new SummaryException("Kein Text zum Zusammenfassen vorhanden");
+            throw new GenAiException("Kein Text zum Zusammenfassen vorhanden");
         }
         return extractSummary(requestSummary(truncate(text.strip())));
     }
@@ -70,10 +70,10 @@ public class GeminiSummaryService implements SummaryService {
                     .retrieve()
                     .body(GenerateResponse.class);
         } catch (RestClientResponseException e) {
-            throw new SummaryException(
+            throw new GenAiException(
                     "Gemini hat die Anfrage mit Status " + e.getStatusCode().value() + " abgelehnt", e);
         } catch (RestClientException e) {
-            throw new SummaryException("Gemini ist nicht erreichbar oder hat unlesbar geantwortet", e);
+            throw new GenAiException("Gemini ist nicht erreichbar oder hat unlesbar geantwortet", e);
         }
     }
 
@@ -84,12 +84,12 @@ public class GeminiSummaryService implements SummaryService {
             String reason = response == null || response.promptFeedback() == null
                     ? "unbekannt"
                     : response.promptFeedback().blockReason();
-            throw new SummaryException("Gemini hat keine Antwort geliefert (Grund: " + reason + ")");
+            throw new GenAiException("Gemini hat keine Antwort geliefert (Grund: " + reason + ")");
         }
         Candidate candidate = response.candidates().getFirst();
         // Alles außer STOP bedeutet: abgebrochen oder blockiert, der Text wäre unvollständig
         if (!"STOP".equals(candidate.finishReason())) {
-            throw new SummaryException("Gemini hat die Antwort abgebrochen (Grund: " + candidate.finishReason() + ")");
+            throw new GenAiException("Gemini hat die Antwort abgebrochen (Grund: " + candidate.finishReason() + ")");
         }
         String summary = candidate.content() == null || candidate.content().parts() == null
                 ? ""
@@ -101,7 +101,7 @@ public class GeminiSummaryService implements SummaryService {
                         .collect(Collectors.joining())
                         .strip();
         if (summary.isEmpty()) {
-            throw new SummaryException("Gemini hat eine leere Antwort geliefert");
+            throw new GenAiException("Gemini hat eine leere Antwort geliefert");
         }
         return summary;
     }

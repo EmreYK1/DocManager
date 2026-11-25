@@ -67,7 +67,7 @@ Beim Start werden 10 Container gestartet:
 - `document-service`: das Backend mit der REST-API. Es hat keinen eigenen Port nach außen, man erreicht es nur über die Oberfläche unter `http://localhost/api`.
 - `ocr-worker`: liest den Text aus den PDFs (mit Ghostscript und Tesseract).
 - `indexing-worker`: trägt den erkannten Text in den Suchindex ein.
-- `genai-worker`: soll Zusammenfassungen mit Google Gemini erstellen. Bisher verbindet er sich nur mit RabbitMQ und prüft beim Start, ob die Konfiguration vorhanden ist.
+- `genai-worker`: erstellt Zusammenfassungen mit Google Gemini. Er bearbeitet Aufträge aus RabbitMQ und schickt das Ergebnis oder eine Fehlermeldung zurück. Das Backend verschickt noch keine solchen Aufträge.
 - `db` (Port 5432): PostgreSQL für Dokumente, Ordner, Kommentare und den erkannten Text. Benutzer und Passwort sind beide `docmanager`.
 - `minio` (Ports 9000 und 9090): speichert die PDF-Dateien. Die Konsole ist unter http://localhost:9090 erreichbar, Benutzer und Passwort sind `minioadmin`.
 - `rabbitmq` (Ports 5672 und 15672): die Nachrichten-Queue zwischen Backend und Workern. Die Verwaltungsseite ist unter http://localhost:15672 erreichbar, Benutzer und Passwort sind `guest`.
@@ -314,7 +314,7 @@ DocManager/
 ├── document-service/     Backend (Spring Boot, REST-API, Upload, Suche)
 ├── ocr-worker/           liest den Text aus den PDFs
 ├── indexing-worker/      schreibt den Text in Elasticsearch
-├── genai-worker/         Zusammenfassungen mit Google Gemini (im Aufbau)
+├── genai-worker/         erstellt Zusammenfassungen mit Google Gemini
 ├── webui/                Oberfläche (React) mit nginx
 ├── docs/samples/         Beispiel-PDF für Tests und Abnahme
 ├── docker-compose.yml    startet alle 10 Container

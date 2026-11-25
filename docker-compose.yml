@@ -101,7 +101,7 @@ services:
       elasticsearch:
         condition: service_healthy
 
-  # Zusammenfassungen mit Google Gemini. Verbindet sich bisher nur mit RabbitMQ und prüft die Konfiguration.
+  # Zusammenfassungen mit Google Gemini. Holt Aufträge aus RabbitMQ und schickt das Ergebnis zurück.
   genai-worker:
     build:
       context: .
