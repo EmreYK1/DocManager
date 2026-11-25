@@ -5,7 +5,7 @@ import com.docmanager.document.entity.Folder;
 import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.exception.StorageException;
-import com.docmanager.document.outbox.Outbox;
+import com.docmanager.document.messaging.MessagePublisher;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.messaging.IndexMessage;
 import com.docmanager.messaging.MessagingTopology;
@@ -42,7 +42,7 @@ public class DocumentService {
     private final FolderService folderService;
     private final StorageService storageService;
     private final SearchIndexService searchIndexService;
-    private final Outbox outbox;
+    private final MessagePublisher messages;
     private final TransactionTemplate transaction;
     private final ApplicationEventPublisher events;
 
@@ -51,14 +51,14 @@ public class DocumentService {
             FolderService folderService,
             StorageService storageService,
             SearchIndexService searchIndexService,
-            Outbox outbox,
+            MessagePublisher messages,
             TransactionTemplate transaction,
             ApplicationEventPublisher events) {
         this.documentRepository = documentRepository;
         this.folderService = folderService;
         this.storageService = storageService;
         this.searchIndexService = searchIndexService;
-        this.outbox = outbox;
+        this.messages = messages;
         this.transaction = transaction;
         this.events = events;
     }
@@ -72,12 +72,12 @@ public class DocumentService {
 
         String objectKey = storageService.store(file);
         try {
-            // Dokument und OCR-Auftrag werden gemeinsam gespeichert
+            // Der OCR-Auftrag wird erst nach dem Commit gesendet
             return transaction.execute(status -> {
                 Folder folder = folderId != null ? folderService.findById(folderId) : null;
                 Document document = documentRepository.save(
                         new Document(filename, file.getContentType(), file.getSize(), folder, objectKey));
-                outbox.add(MessagingTopology.OCR_REQUEST_KEY, new OcrRequestMessage(document.getId(), objectKey));
+                messages.send(MessagingTopology.OCR_REQUEST_KEY, new OcrRequestMessage(document.getId(), objectKey));
                 log.info("Dokument erstellt: id={}, filename={}", document.getId(), filename);
                 return document;
             });
@@ -137,7 +137,7 @@ public class DocumentService {
     public void delete(UUID id) {
         Document document = findById(id);
         documentRepository.delete(document);
-        outbox.add(MessagingTopology.INDEX_KEY, IndexMessage.delete(id));
+        messages.send(MessagingTopology.INDEX_KEY, IndexMessage.delete(id));
         if (document.getObjectKey() != null) {
             events.publishEvent(new FileDiscarded(document.getObjectKey()));
         }
@@ -169,7 +169,7 @@ public class DocumentService {
     }
 
     private void requestIndexing(Document document) {
-        outbox.add(
+        messages.send(
                 MessagingTopology.INDEX_KEY,
                 IndexMessage.upsert(document.getId(), document.getFilename(), document.getOcrText()));
     }

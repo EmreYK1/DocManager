@@ -6,7 +6,7 @@ import com.docmanager.document.entity.Folder;
 import com.docmanager.document.exception.InvalidFileException;
 import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.exception.StorageException;
-import com.docmanager.document.outbox.Outbox;
+import com.docmanager.document.messaging.MessagePublisher;
 import com.docmanager.document.repository.DocumentRepository;
 import com.docmanager.messaging.IndexMessage;
 import com.docmanager.messaging.MessagingTopology;
@@ -49,7 +49,7 @@ class DocumentServiceTest {
     private SearchIndexService searchIndexService;
 
     @Mock
-    private Outbox outbox;
+    private MessagePublisher messages;
 
     @Mock
     private TransactionTemplate transaction;
@@ -97,7 +97,7 @@ class DocumentServiceTest {
 
         assertThat(documentService.upload(pdf, null)).isSameAs(document);
 
-        verify(outbox).add(MessagingTopology.OCR_REQUEST_KEY, new OcrRequestMessage(id, "key"));
+        verify(messages).send(MessagingTopology.OCR_REQUEST_KEY, new OcrRequestMessage(id, "key"));
     }
 
     @Test
@@ -123,7 +123,7 @@ class DocumentServiceTest {
                     .isInstanceOf(InvalidFileException.class)
                     .hasMessage("Nur PDF-Dateien sind erlaubt");
         }
-        verifyNoInteractions(storageService, documentRepository, outbox);
+        verifyNoInteractions(storageService, documentRepository, messages);
     }
 
     @Test
@@ -142,7 +142,7 @@ class DocumentServiceTest {
 
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.OCR_DONE);
         assertThat(document.getOcrText()).isEqualTo("Hello");
-        verify(outbox, times(1)).add(MessagingTopology.INDEX_KEY, IndexMessage.upsert(id, "test.pdf", "Hello"));
+        verify(messages, times(1)).send(MessagingTopology.INDEX_KEY, IndexMessage.upsert(id, "test.pdf", "Hello"));
     }
 
     @Test
@@ -152,14 +152,14 @@ class DocumentServiceTest {
         documentService.applyOcrResult(OcrResultMessage.failed(id, "kaputt"));
 
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.FAILED);
-        verifyNoInteractions(outbox);
+        verifyNoInteractions(messages);
     }
 
     @Test
     void applyOcrResult_deletedDocument_isDiscarded() {
         documentService.applyOcrResult(OcrResultMessage.succeeded(id, "Hello"));
 
-        verifyNoInteractions(outbox);
+        verifyNoInteractions(messages);
     }
 
     @Test
@@ -167,12 +167,12 @@ class DocumentServiceTest {
     void update_rename_reindexesOnlySearchableDocuments() {
         found();
         documentService.update(id, new DocumentUpdate("pending.pdf", null, false));
-        verifyNoInteractions(outbox);
+        verifyNoInteractions(messages);
 
         document.completeOcr("Hello");
         documentService.update(id, new DocumentUpdate("neu.pdf", null, false));
 
-        verify(outbox).add(MessagingTopology.INDEX_KEY, IndexMessage.upsert(id, "neu.pdf", "Hello"));
+        verify(messages).send(MessagingTopology.INDEX_KEY, IndexMessage.upsert(id, "neu.pdf", "Hello"));
     }
 
     @Test
@@ -200,7 +200,7 @@ class DocumentServiceTest {
         documentService.delete(id);
 
         verify(documentRepository).delete(document);
-        verify(outbox).add(MessagingTopology.INDEX_KEY, IndexMessage.delete(id));
+        verify(messages).send(MessagingTopology.INDEX_KEY, IndexMessage.delete(id));
         verify(events).publishEvent(new DocumentService.FileDiscarded("key"));
         verifyNoInteractions(storageService); // erst nach dem Commit
     }

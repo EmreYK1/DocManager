@@ -5,7 +5,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default [
-  { ignores: ['dist/', 'playwright-report/', 'test-results/'] },
+  { ignores: ['dist/'] },
   js.configs.recommended,
   {
     files: ['**/*.{js,jsx}'],
@@ -21,7 +21,7 @@ export default [
   },
   ...tseslint.configs.recommended.map((config) => ({ ...config, files: ['**/*.ts'] })),
   {
-    files: ['e2e/**', '*.config.js'],
+    files: ['*.config.js'],
     languageOptions: { globals: globals.node },
   },
 ]

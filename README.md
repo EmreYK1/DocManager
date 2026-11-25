@@ -66,7 +66,7 @@ Falls auf deinem Rechner schon ein eigenes PostgreSQL auf Port 5432 läuft, verb
 
 ## Was nach einem Upload passiert
 
-1. Die Oberfläche schickt das PDF an `POST /api/documents/upload`. Das Backend prüft den Content-Type und ob die Datei mit `%PDF-` beginnt, legt die Datei in MinIO ab und speichert das Dokument mit dem Status `OCR_PENDING`. In derselben Datenbank-Transaktion merkt es den OCR-Auftrag in einer Outbox-Tabelle vor und sendet ihn kurz danach an RabbitMQ.
+1. Die Oberfläche schickt das PDF an `POST /api/documents/upload`. Das Backend prüft den Content-Type und ob die Datei mit `%PDF-` beginnt, legt die Datei in MinIO ab und speichert das Dokument mit dem Status `OCR_PENDING`. Sobald das Dokument gespeichert ist, schickt es den OCR-Auftrag an RabbitMQ.
 2. Der `ocr-worker` holt das PDF aus MinIO und wandelt es mit Ghostscript in Bilder um. Tesseract liest den Text von jeder Seite. Das Ergebnis, oder bei einem unlesbaren PDF eine Fehlermeldung, schickt er zurück.
 3. Das Backend speichert den Text und setzt den Status auf `OCR_DONE` oder `FAILED`. Danach beauftragt es den `indexing-worker`, Dateiname und Text in Elasticsearch zu schreiben. Auch beim Umbenennen und Löschen bekommt der `indexing-worker` einen Auftrag. Nur er schreibt in den Index, und alle Aufträge laufen durch dieselbe Queue.
 4. Bei einer Suche fragt das Backend Elasticsearch nach den passenden Dokumenten und holt sie dann aus der Datenbank.
@@ -74,7 +74,6 @@ Falls auf deinem Rechner schon ein eigenes PostgreSQL auf Port 5432 läuft, verb
 
 ### Wenn etwas ausfällt
 
-- Ist RabbitMQ nicht erreichbar, bleiben die Nachrichten in der Outbox und werden später gesendet. Der Upload funktioniert trotzdem.
 - Schlägt die Verarbeitung einer Nachricht fehl, wird sie viermal versucht (mit 1, 3 und 9 Sekunden Abstand). Danach landet sie in der Queue `docmanager.dead-letter`. Dort kann man sie in der RabbitMQ-Verwaltung ansehen und erneut senden. Ein gescheiterter OCR-Auftrag setzt das Dokument außerdem auf `FAILED`.
 - Kommt eine Nachricht doppelt an, schadet das nicht.
 
@@ -269,12 +268,9 @@ cd webui
 npm test                       # Oberfläche
 npm run lint                   # ESLint und Prettier ("npm run format" formatiert)
 npm run typecheck              # TypeScript im Ordner api
-
-npx playwright install chromium   # einmalig
-npm run e2e                    # Browsertest gegen den laufenden Docker-Stack
 ```
 
-Die meisten Backend-Tests sind Unit-Tests. `DocumentFlowIntegrationTest` prüft den Weg eines Dokuments durch das echte Backend. PostgreSQL, RabbitMQ und MinIO startet er selbst als Container (Testcontainers), dafür muss nur Docker laufen. `ArchitectureTest` prüft, dass die Schichten eingehalten werden.
+Die meisten Backend-Tests sind Unit-Tests. `DocumentFlowIntegrationTest` prüft den Weg eines Dokuments durch das echte Backend. PostgreSQL, RabbitMQ und MinIO startet er selbst als Container (Testcontainers), dafür muss nur Docker laufen.
 
 Der Test `TesseractOcrServiceRealTest` im `ocr-worker` liest das echte `HelloWorld.pdf`. Er läuft nur, wenn Tesseract und Ghostscript installiert sind, sonst wird er übersprungen. Die Tests der Oberfläche benutzen Vitest und Testing Library und mocken die API.
 
@@ -288,7 +284,7 @@ Der Test `TesseractOcrServiceRealTest` im `ocr-worker` liest das echte `HelloWor
 - Texterkennung: Ghostscript und Tesseract
 - Suche: Elasticsearch 8, dazu Kibana zum Nachschauen
 - Webserver: nginx
-- Tests: JUnit 5, Mockito, Testcontainers, ArchUnit, Vitest, Testing Library, Playwright
+- Tests: JUnit 5, Mockito, Testcontainers, Vitest, Testing Library
 - Codestil: Spotless, ESLint, Prettier
 - Betrieb: Docker und Docker Compose, CI mit GitHub Actions
 
@@ -303,11 +299,11 @@ DocManager/
 ├── webui/                Oberfläche (React) mit nginx
 ├── docs/samples/         Beispiel-PDF für Tests und Abnahme
 ├── docker-compose.yml    startet alle 9 Container
-├── .github/workflows/    CI (Stil, Typen, Tests und Browsertest)
+├── .github/workflows/    CI (Stil, Typen und Tests)
 └── pom.xml               Maven-Projekt für die vier Java-Module
 ```
 
-Im Backend ist der Code nach Aufgaben getrennt: `controller` (REST), `service` (Logik; Interfaces gibt es nur für Zugriffe nach außen wie Speicher und Suche, die Umsetzung liegt in `impl`), `outbox` (vorgemerkte Nachrichten), `repository`, `entity`, `dto`, `mapper`, `messaging` (RabbitMQ) und `exception`. In der Oberfläche liegen die Seiten in `pages`, die wiederverwendbaren Teile in `components`, die Aufrufe an das Backend in `api` und die Prüfungen für Eingaben in `validation`.
+Im Backend ist der Code nach Aufgaben getrennt: `controller` (REST), `service` (Logik; Interfaces gibt es nur für Zugriffe nach außen wie Speicher und Suche, die Umsetzung liegt in `impl`), `repository`, `entity`, `dto`, `mapper`, `messaging` (RabbitMQ) und `exception`. In der Oberfläche liegen die Seiten in `pages`, die wiederverwendbaren Teile in `components`, die Aufrufe an das Backend in `api` und die Prüfungen für Eingaben in `validation`.
 
 ## Was noch fehlt
 
