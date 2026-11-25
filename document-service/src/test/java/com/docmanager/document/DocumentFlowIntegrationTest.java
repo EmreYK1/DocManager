@@ -4,6 +4,8 @@ import com.docmanager.messaging.IndexMessage;
 import com.docmanager.messaging.MessagingTopology;
 import com.docmanager.messaging.OcrRequestMessage;
 import com.docmanager.messaging.OcrResultMessage;
+import com.docmanager.messaging.SummaryRequestMessage;
+import com.docmanager.messaging.SummaryResultMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.minio.ListObjectsArgs;
 import io.minio.MinioClient;
@@ -36,7 +38,7 @@ import static org.awaitility.Awaitility.await;
 
 /**
  * Der Weg eines Dokuments durch das echte Backend mit PostgreSQL, RabbitMQ und MinIO. Der Test spielt
- * selbst den ocr-worker und liest mit, was der indexing-worker bekäme. Braucht Docker.
+ * selbst den ocr-worker und den genai-worker und liest mit, was der indexing-worker bekäme. Braucht Docker.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -87,6 +89,18 @@ class DocumentFlowIntegrationTest {
         await().untilAsserted(() ->
                 assertThat(get("/documents/" + id).get("status").asText()).isEqualTo("OCR_DONE"));
         assertThat(nextIndexMessage()).isEqualTo(IndexMessage.upsert(request.documentId(), "a.pdf", "Hello World"));
+
+        SummaryRequestMessage summaryRequest =
+                receive(MessagingTopology.SUMMARY_REQUEST_QUEUE, new ParameterizedTypeReference<>() {});
+        assertThat(summaryRequest).isEqualTo(new SummaryRequestMessage(request.documentId(), "Hello World"));
+
+        rabbit.convertAndSend(
+                MessagingTopology.EXCHANGE,
+                MessagingTopology.SUMMARY_RESULT_KEY,
+                SummaryResultMessage.succeeded(request.documentId(), "Kurzfassung"));
+        await().untilAsserted(() ->
+                assertThat(get("/documents/" + id).get("status").asText()).isEqualTo("SUMMARY_DONE"));
+        assertThat(get("/documents/" + id).get("summary").asText()).isEqualTo("Kurzfassung");
 
         patch(id, Map.of("filename", "b.pdf"));
         assertThat(nextIndexMessage().filename()).isEqualTo("b.pdf");

@@ -12,6 +12,8 @@ import com.docmanager.messaging.IndexMessage;
 import com.docmanager.messaging.MessagingTopology;
 import com.docmanager.messaging.OcrRequestMessage;
 import com.docmanager.messaging.OcrResultMessage;
+import com.docmanager.messaging.SummaryRequestMessage;
+import com.docmanager.messaging.SummaryResultMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -143,6 +145,8 @@ class DocumentServiceTest {
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.OCR_DONE);
         assertThat(document.getOcrText()).isEqualTo("Hello");
         verify(messages, times(1)).send(MessagingTopology.INDEX_KEY, IndexMessage.upsert(id, "test.pdf", "Hello"));
+        verify(messages, times(1))
+                .send(MessagingTopology.SUMMARY_REQUEST_KEY, new SummaryRequestMessage(id, "Hello"));
     }
 
     @Test
@@ -159,6 +163,46 @@ class DocumentServiceTest {
     void applyOcrResult_deletedDocument_isDiscarded() {
         documentService.applyOcrResult(OcrResultMessage.succeeded(id, "Hello"));
 
+        verifyNoInteractions(messages);
+    }
+
+    @Test
+    @DisplayName("Summary-Erfolg speichert die Zusammenfassung, spätere Nachrichten ändern nichts")
+    void applySummaryResult_isIdempotent() {
+        found();
+        document.completeOcr("Hello");
+
+        documentService.applySummaryResult(SummaryResultMessage.succeeded(id, "Kurz"));
+        documentService.applySummaryResult(SummaryResultMessage.succeeded(id, "andere Zusammenfassung"));
+        documentService.applySummaryResult(SummaryResultMessage.failed(id, "zu spät"));
+        documentService.applyOcrResult(OcrResultMessage.succeeded(id, "verspäteter Text"));
+        documentService.applyOcrResult(OcrResultMessage.failed(id, "verspätet"));
+
+        assertThat(document.getStatus()).isEqualTo(DocumentStatus.SUMMARY_DONE);
+        assertThat(document.getSummary()).isEqualTo("Kurz");
+        assertThat(document.getOcrText()).isEqualTo("Hello");
+        verifyNoInteractions(messages);
+    }
+
+    @Test
+    void applySummaryResult_failure_keepsOcrText() {
+        found();
+        document.completeOcr("Hello");
+
+        documentService.applySummaryResult(SummaryResultMessage.failed(id, "Status 503"));
+
+        assertThat(document.getStatus()).isEqualTo(DocumentStatus.SUMMARY_FAILED);
+        assertThat(document.getOcrText()).isEqualTo("Hello");
+        assertThat(document.getSummary()).isNull();
+        assertThat(document.isSearchable()).isTrue();
+    }
+
+    @Test
+    void applySummaryResult_unknownDocument_isIgnored() {
+        assertThatCode(() -> documentService.applySummaryResult(SummaryResultMessage.succeeded(id, "Kurz")))
+                .doesNotThrowAnyException();
+
+        verify(documentRepository, never()).save(any());
         verifyNoInteractions(messages);
     }
 
