@@ -11,6 +11,8 @@ import com.docmanager.messaging.IndexMessage;
 import com.docmanager.messaging.MessagingTopology;
 import com.docmanager.messaging.OcrRequestMessage;
 import com.docmanager.messaging.OcrResultMessage;
+import com.docmanager.messaging.SummaryRequestMessage;
+import com.docmanager.messaging.SummaryResultMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -127,10 +129,27 @@ public class DocumentService {
         if (result.success()) {
             if (document.completeOcr(result.text())) {
                 requestIndexing(document);
+                requestSummary(document);
                 log.info("Texterkennung abgeschlossen: id={}", document.getId());
             }
         } else if (document.failOcr()) {
             log.warn("Texterkennung fehlgeschlagen: id={}, grund={}", document.getId(), result.errorMessage());
+        }
+    }
+
+    /** Idempotent wie {@link #applyOcrResult}. */
+    public void applySummaryResult(SummaryResultMessage result) {
+        Document document = documentRepository.findById(result.documentId()).orElse(null);
+        if (document == null) {
+            log.warn("Summary-Ergebnis für unbekanntes oder gelöschtes Dokument verworfen: {}", result.documentId());
+            return;
+        }
+        if (result.success()) {
+            if (document.completeSummary(result.summary())) {
+                log.info("Zusammenfassung gespeichert: id={}", document.getId());
+            }
+        } else if (document.failSummary()) {
+            log.warn("Zusammenfassung fehlgeschlagen: id={}, grund={}", document.getId(), result.errorMessage());
         }
     }
 
@@ -172,6 +191,12 @@ public class DocumentService {
         messages.send(
                 MessagingTopology.INDEX_KEY,
                 IndexMessage.upsert(document.getId(), document.getFilename(), document.getOcrText()));
+    }
+
+    private void requestSummary(Document document) {
+        messages.send(
+                MessagingTopology.SUMMARY_REQUEST_KEY,
+                new SummaryRequestMessage(document.getId(), document.getOcrText()));
     }
 
     private void requirePdf(MultipartFile file) {

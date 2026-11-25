@@ -98,6 +98,16 @@ public class Document {
         return true;
     }
 
+    /** Wie {@link #completeOcr}, aber für die Zusammenfassung, die erst nach der Texterkennung kommt. */
+    public boolean completeSummary(String text) {
+        if (status != DocumentStatus.OCR_DONE) {
+            return false;
+        }
+        summary = text;
+        status = DocumentStatus.SUMMARY_DONE;
+        return true;
+    }
+
     /** Wie {@link #failOcr}, aber für eine gescheiterte Zusammenfassung. Der OCR-Text bleibt erhalten. */
     public boolean failSummary() {
         if (status != DocumentStatus.OCR_DONE) {
