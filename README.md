@@ -67,7 +67,7 @@ Beim Start werden 10 Container gestartet:
 - `document-service`: das Backend mit der REST-API. Es hat keinen eigenen Port nach außen, man erreicht es nur über die Oberfläche unter `http://localhost/api`.
 - `ocr-worker`: liest den Text aus den PDFs (mit Ghostscript und Tesseract).
 - `indexing-worker`: trägt den erkannten Text in den Suchindex ein.
-- `genai-worker`: für die Anbindung an Google Gemini. Bisher prüft er nur beim Start, ob die Konfiguration vorhanden ist.
+- `genai-worker`: soll Zusammenfassungen mit Google Gemini erstellen. Bisher verbindet er sich nur mit RabbitMQ und prüft beim Start, ob die Konfiguration vorhanden ist.
 - `db` (Port 5432): PostgreSQL für Dokumente, Ordner, Kommentare und den erkannten Text. Benutzer und Passwort sind beide `docmanager`.
 - `minio` (Ports 9000 und 9090): speichert die PDF-Dateien. Die Konsole ist unter http://localhost:9090 erreichbar, Benutzer und Passwort sind `minioadmin`.
 - `rabbitmq` (Ports 5672 und 15672): die Nachrichten-Queue zwischen Backend und Workern. Die Verwaltungsseite ist unter http://localhost:15672 erreichbar, Benutzer und Passwort sind `guest`.
@@ -245,7 +245,7 @@ Der `ocr-worker` nutzt dieselben Variablen für RabbitMQ und MinIO. Dazu kommen:
 
 Der `indexing-worker` braucht die Variablen für RabbitMQ sowie `ELASTICSEARCH_URL` und `ELASTICSEARCH_INDEX`.
 
-Der `genai-worker` nutzt `GEMINI_API_KEY` (nötig für Gemini) und `GEMINI_MODEL` (Standard `gemini-3.8-flash`). Ohne Docker liest er die `.env` nicht, dann müssen die Variablen im Terminal gesetzt sein.
+Der `genai-worker` braucht die Variablen für RabbitMQ. Dazu nutzt er `GEMINI_API_KEY` (nötig für Gemini) und `GEMINI_MODEL` (Standard `gemini-3.8-flash`). Ohne Docker liest er die `.env` nicht, dann müssen die Variablen im Terminal gesetzt sein.
 
 Die Namen von Exchange, Queues und Routing-Keys stehen an einer Stelle: `MessagingTopology` im Modul `messaging-contract`.
 
@@ -312,7 +312,7 @@ DocManager/
 ├── document-service/     Backend (Spring Boot, REST-API, Upload, Suche)
 ├── ocr-worker/           liest den Text aus den PDFs
 ├── indexing-worker/      schreibt den Text in Elasticsearch
-├── genai-worker/         Anbindung an Google Gemini
+├── genai-worker/         Zusammenfassungen mit Google Gemini (im Aufbau)
 ├── webui/                Oberfläche (React) mit nginx
 ├── docs/samples/         Beispiel-PDF für Tests und Abnahme
 ├── docker-compose.yml    startet alle 10 Container

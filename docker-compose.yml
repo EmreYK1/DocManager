@@ -101,16 +101,23 @@ services:
       elasticsearch:
         condition: service_healthy
 
-  # Anbindung an Google Gemini. Prüft bisher nur beim Start, ob die Konfiguration vorhanden ist.
+  # Zusammenfassungen mit Google Gemini. Verbindet sich bisher nur mit RabbitMQ und prüft die Konfiguration.
   genai-worker:
     build:
       context: .
       dockerfile: genai-worker/Dockerfile
     container_name: docmanager-genai-worker
     environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
       # Die Werte kommen aus der lokalen .env (Vorlage: .env.example). Nie den Key hier eintragen!
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   # ─── Infrastruktur ──────────────────────────────────────────────────────────
 

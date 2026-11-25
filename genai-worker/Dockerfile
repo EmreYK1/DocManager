@@ -8,6 +8,7 @@ COPY document-service/pom.xml document-service/
 COPY ocr-worker/pom.xml ocr-worker/
 COPY indexing-worker/pom.xml indexing-worker/
 COPY genai-worker/pom.xml genai-worker/
+COPY messaging-contract/src messaging-contract/src
 COPY genai-worker/src genai-worker/src
 # Das Maven-Repository bleibt zwischen den Builds im Cache
 RUN --mount=type=cache,target=/root/.m2 mvn -B -q -pl genai-worker -am package -DskipTests

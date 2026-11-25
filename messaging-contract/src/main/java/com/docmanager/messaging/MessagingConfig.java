@@ -27,15 +27,21 @@ public class MessagingConfig {
         Queue ocrRequests = new Queue(OCR_REQUEST_QUEUE);
         Queue ocrResults = new Queue(OCR_RESULT_QUEUE);
         Queue index = new Queue(INDEX_QUEUE);
+        Queue summaryRequests = new Queue(SUMMARY_REQUEST_QUEUE);
+        Queue summaryResults = new Queue(SUMMARY_RESULT_QUEUE);
         return new Declarables(
                 exchange,
                 ocrRequests,
                 ocrResults,
                 index,
+                summaryRequests,
+                summaryResults,
                 new Queue(DEAD_LETTER_QUEUE),
                 BindingBuilder.bind(ocrRequests).to(exchange).with(OCR_REQUEST_KEY),
                 BindingBuilder.bind(ocrResults).to(exchange).with(OCR_RESULT_KEY),
-                BindingBuilder.bind(index).to(exchange).with(INDEX_KEY));
+                BindingBuilder.bind(index).to(exchange).with(INDEX_KEY),
+                BindingBuilder.bind(summaryRequests).to(exchange).with(SUMMARY_REQUEST_KEY),
+                BindingBuilder.bind(summaryResults).to(exchange).with(SUMMARY_RESULT_KEY));
     }
 
     /** Spring Boot nutzt den Converter für das RabbitTemplate und alle Listener. */
