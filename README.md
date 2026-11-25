@@ -67,7 +67,7 @@ Beim Start werden 10 Container gestartet:
 - `document-service`: das Backend mit der REST-API. Es hat keinen eigenen Port nach außen, man erreicht es nur über die Oberfläche unter `http://localhost/api`.
 - `ocr-worker`: liest den Text aus den PDFs (mit Ghostscript und Tesseract).
 - `indexing-worker`: trägt den erkannten Text in den Suchindex ein.
-- `genai-worker`: erstellt Zusammenfassungen mit Google Gemini. Er bearbeitet Aufträge aus RabbitMQ und schickt das Ergebnis oder eine Fehlermeldung zurück. Das Backend verschickt noch keine solchen Aufträge.
+- `genai-worker`: erstellt Zusammenfassungen mit Google Gemini. Er bearbeitet Aufträge aus RabbitMQ und schickt das Ergebnis oder eine Fehlermeldung zurück.
 - `db` (Port 5432): PostgreSQL für Dokumente, Ordner, Kommentare und den erkannten Text. Benutzer und Passwort sind beide `docmanager`.
 - `minio` (Ports 9000 und 9090): speichert die PDF-Dateien. Die Konsole ist unter http://localhost:9090 erreichbar, Benutzer und Passwort sind `minioadmin`.
 - `rabbitmq` (Ports 5672 und 15672): die Nachrichten-Queue zwischen Backend und Workern. Die Verwaltungsseite ist unter http://localhost:15672 erreichbar, Benutzer und Passwort sind `guest`.
@@ -83,15 +83,24 @@ Falls auf deinem Rechner schon ein eigenes PostgreSQL auf Port 5432 läuft, verb
 1. Die Oberfläche schickt das PDF an `POST /api/documents/upload`. Das Backend prüft den Content-Type und ob die Datei mit `%PDF-` beginnt, legt die Datei in MinIO ab und speichert das Dokument mit dem Status `OCR_PENDING`. Sobald das Dokument gespeichert ist, schickt es den OCR-Auftrag an RabbitMQ.
 2. Der `ocr-worker` holt das PDF aus MinIO und wandelt es mit Ghostscript in Bilder um. Tesseract liest den Text von jeder Seite. Das Ergebnis, oder bei einem unlesbaren PDF eine Fehlermeldung, schickt er zurück.
 3. Das Backend speichert den Text und setzt den Status auf `OCR_DONE` oder `FAILED`. Danach beauftragt es den `indexing-worker`, Dateiname und Text in Elasticsearch zu schreiben. Auch beim Umbenennen und Löschen bekommt der `indexing-worker` einen Auftrag. Nur er schreibt in den Index, und alle Aufträge laufen durch dieselbe Queue.
-4. Bei einer Suche fragt das Backend Elasticsearch nach den passenden Dokumenten und holt sie dann aus der Datenbank.
-5. Solange ein Dokument auf `OCR_PENDING` steht, lädt die Oberfläche die Liste alle 3 Sekunden neu (höchstens 5 Minuten lang). So sieht man den neuen Status, ohne die Seite neu zu laden.
+4. War die Texterkennung erfolgreich, beauftragt das Backend außerdem den `genai-worker`, den Text zusammenzufassen. Kommt eine Zusammenfassung zurück, speichert es sie und setzt den Status auf `SUMMARY_DONE`. Meldet der Worker einen Fehler, wird der Status `SUMMARY_FAILED`. Der erkannte Text bleibt dabei erhalten, und das Dokument ist weiterhin über die Suche auffindbar.
+5. Bei einer Suche fragt das Backend Elasticsearch nach den passenden Dokumenten und holt sie dann aus der Datenbank.
+6. Solange ein Dokument auf `OCR_PENDING` steht, lädt die Oberfläche die Liste alle 3 Sekunden neu (höchstens 5 Minuten lang). So sieht man den neuen Status, ohne die Seite neu zu laden.
+
+### Reihenfolge von Texterkennung und Zusammenfassung
+
+Ursprünglich sollte der `genai-worker` gleichzeitig mit dem Backend auf das OCR-Ergebnis warten. Dann hätte die Zusammenfassung vor dem OCR-Ergebnis beim Backend ankommen können. Wir haben uns deshalb dafür entschieden, dass das Backend die Zusammenfassung selbst anstößt:
+
+- Der Auftrag an den `genai-worker` wird erst gesendet, nachdem `OCR_DONE` in der Datenbank gespeichert ist. Das Summary-Ergebnis kann also nie vor dem OCR-Ergebnis verarbeitet werden.
+- Ein OCR-Ergebnis wirkt nur im Status `OCR_PENDING`, ein Summary-Ergebnis nur im Status `OCR_DONE`. Eine doppelte oder verspätete Nachricht kann deshalb keinen späteren Status zurücksetzen.
+- Ändern zwei Vorgänge dasselbe Dokument gleichzeitig, verhindert die Versionsspalte (`@Version`), dass einer den anderen unbemerkt überschreibt.
 
 ### Wenn etwas ausfällt
 
 - Schlägt die Verarbeitung einer Nachricht fehl, wird sie viermal versucht (mit 1, 3 und 9 Sekunden Abstand). Danach landet sie in der Queue `docmanager.dead-letter`. Dort kann man sie in der RabbitMQ-Verwaltung ansehen und erneut senden. Ein gescheiterter OCR-Auftrag setzt das Dokument außerdem auf `FAILED`.
 - Kommt eine Nachricht doppelt an, schadet das nicht.
 
-In der Oberfläche zeigen wir statt der Statuswerte aus der API einen verständlichen Text an: `OCR_PENDING` heißt dort "Text wird erkannt...", `OCR_DONE` heißt "Durchsuchbar" und `FAILED` heißt "Texterkennung fehlgeschlagen". Die Werte `UPLOADED` und `SUMMARY_DONE` gibt es im Datenmodell auch, sie werden aber im Moment nicht automatisch gesetzt.
+In der Oberfläche zeigen wir statt der Statuswerte aus der API einen verständlichen Text an: `OCR_PENDING` heißt dort "Text wird erkannt...", `OCR_DONE` heißt "Durchsuchbar" und `FAILED` heißt "Texterkennung fehlgeschlagen". `SUMMARY_DONE` heißt "Zusammenfassung fertig". Für `SUMMARY_FAILED` hat die Oberfläche noch keinen eigenen Text und zeigt den Wert selbst an. Den Wert `UPLOADED` gibt es im Datenmodell auch, er wird aber im Moment nicht automatisch gesetzt.
 
 ## Abnahme-Checkliste
 
