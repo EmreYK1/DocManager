@@ -5,5 +5,7 @@ public enum DocumentStatus {
     OCR_PENDING,
     OCR_DONE,
     SUMMARY_DONE,
+    /** Die Zusammenfassung ist gescheitert, der erkannte Text bleibt nutzbar. */
+    SUMMARY_FAILED,
     FAILED
 }

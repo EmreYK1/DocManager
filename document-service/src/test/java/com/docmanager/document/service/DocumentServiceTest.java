@@ -176,6 +176,20 @@ class DocumentServiceTest {
     }
 
     @Test
+    @DisplayName("Eine gescheiterte Zusammenfassung behält den OCR-Text, das Dokument bleibt durchsuchbar")
+    void failSummary_keepsTextAndStaysSearchable() {
+        assertThat(document.failSummary()).isFalse(); // vor der Texterkennung
+
+        document.completeOcr("Hello");
+
+        assertThat(document.failSummary()).isTrue();
+        assertThat(document.failSummary()).isFalse(); // doppelte Nachricht
+        assertThat(document.getStatus()).isEqualTo(DocumentStatus.SUMMARY_FAILED);
+        assertThat(document.getOcrText()).isEqualTo("Hello");
+        assertThat(document.isSearchable()).isTrue();
+    }
+
+    @Test
     void update_assignsAndClearsFolder() {
         found();
         UUID folderId = UUID.randomUUID();

@@ -98,8 +98,19 @@ public class Document {
         return true;
     }
 
+    /** Wie {@link #failOcr}, aber für eine gescheiterte Zusammenfassung. Der OCR-Text bleibt erhalten. */
+    public boolean failSummary() {
+        if (status != DocumentStatus.OCR_DONE) {
+            return false;
+        }
+        status = DocumentStatus.SUMMARY_FAILED;
+        return true;
+    }
+
     /** Durchsuchbar ist ein Dokument erst, wenn sein Text erkannt wurde. */
     public boolean isSearchable() {
-        return status == DocumentStatus.OCR_DONE || status == DocumentStatus.SUMMARY_DONE;
+        return status == DocumentStatus.OCR_DONE
+                || status == DocumentStatus.SUMMARY_DONE
+                || status == DocumentStatus.SUMMARY_FAILED;
     }
 }
