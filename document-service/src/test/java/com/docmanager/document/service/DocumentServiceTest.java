@@ -145,8 +145,7 @@ class DocumentServiceTest {
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.OCR_DONE);
         assertThat(document.getOcrText()).isEqualTo("Hello");
         verify(messages, times(1)).send(MessagingTopology.INDEX_KEY, IndexMessage.upsert(id, "test.pdf", "Hello"));
-        verify(messages, times(1))
-                .send(MessagingTopology.SUMMARY_REQUEST_KEY, new SummaryRequestMessage(id, "Hello"));
+        verify(messages, times(1)).send(MessagingTopology.SUMMARY_REQUEST_KEY, new SummaryRequestMessage(id, "Hello"));
     }
 
     @Test
