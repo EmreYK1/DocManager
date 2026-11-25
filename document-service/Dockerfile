@@ -7,6 +7,7 @@ COPY messaging-contract/pom.xml messaging-contract/
 COPY document-service/pom.xml document-service/
 COPY ocr-worker/pom.xml ocr-worker/
 COPY indexing-worker/pom.xml indexing-worker/
+COPY genai-worker/pom.xml genai-worker/
 COPY messaging-contract/src messaging-contract/src
 COPY document-service/src document-service/src
 # Das Maven-Repository bleibt zwischen den Builds im Cache

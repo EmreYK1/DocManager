@@ -17,6 +17,7 @@
         <module>document-service</module>
         <module>ocr-worker</module>
         <module>indexing-worker</module>
+        <module>genai-worker</module>
     </modules>
 
     <properties>

@@ -1,6 +1,8 @@
 # Build-Kontext klein halten: Die Java-Images bauen aus dem Projekt-Root,
 # brauchen aber nur die pom.xml-Dateien und den jeweiligen src-Ordner.
 **/target/
+# enthält den Gemini-API-Key
+.env
 **/node_modules/
 **/dist/
 .git/

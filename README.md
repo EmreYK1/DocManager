@@ -26,9 +26,11 @@ cd DocManager
 docker compose up -d --build
 ```
 
+Für Google Gemini braucht man zusätzlich einen API-Key, siehe [Gemini-API-Key einrichten](#gemini-api-key-einrichten). Alle anderen Funktionen laufen auch ohne Key.
+
 Das `-d` sorgt dafür, dass alles im Hintergrund läuft. Ohne `-d` schreiben alle Container gleichzeitig ins Terminal, und das sind schnell ein paar tausend Zeilen. Beim ersten Mal dauert es einige Minuten, weil die Images gebaut und geladen werden.
 
-Mit `docker compose ps` siehst du, ob alles läuft. Es müssen 9 Container laufen. Das Backend braucht nach dem Start etwa eine Minute, bis es bereit ist. Die Weboberfläche startet erst danach. Wenn du sie zu früh aufrufst, siehst du kurz "502 Bad Gateway".
+Mit `docker compose ps` siehst du, ob alles läuft. Es müssen 10 Container laufen. Das Backend braucht nach dem Start etwa eine Minute, bis es bereit ist. Die Weboberfläche startet erst danach. Wenn du sie zu früh aufrufst, siehst du kurz "502 Bad Gateway".
 
 Wenn alles läuft, öffnest du http://localhost.
 
@@ -42,18 +44,30 @@ docker compose down -v                   # alles stoppen und alle Daten löschen
 docker compose up -d --build webui       # nur die Oberfläche neu bauen
 ```
 
+### Gemini-API-Key einrichten
+
+Der `genai-worker` braucht einen API-Key für Google Gemini.
+
+1. Unter https://aistudio.google.com/apikey mit einem Google-Konto anmelden und einen API-Key erstellen.
+2. Im Projektordner die Vorlage kopieren: `cp .env.example .env`
+3. In der `.env` den Key hinter `GEMINI_API_KEY=` eintragen. Mit `GEMINI_MODEL` kann man ein anderes Modell wählen (Standard `gemini-3.8-flash`).
+4. `docker compose up -d --build genai-worker` ausführen. Mit `docker compose logs genai-worker` sieht man, ob die Konfiguration erkannt wurde.
+
+Die `.env` steht in der `.gitignore`. Den Key nie in `.env.example`, in `docker-compose.yml` oder in den Code schreiben. Ohne Key läuft der Worker weiter und schreibt eine Fehlermeldung ins Log. Gleichnamige Umgebungsvariablen im Terminal haben Vorrang vor der `.env`. Achtung: `docker compose config` zeigt den Key im Klartext an, also die Ausgabe nicht weitergeben.
+
 ### Erste Schritte
 
 Auf http://localhost kannst du mit "PDF hochladen" ein PDF auswählen. Ein Beispiel liegt unter `docs/samples/HelloWorld.pdf`. Nach dem Upload steht das Dokument in der Tabelle mit dem Status "Text wird erkannt...". Nach ein paar Sekunden wechselt der Status von selbst auf "Durchsuchbar". Dann kannst du im Suchfeld nach einem Wort aus dem PDF suchen, zum Beispiel nach "Hello". Ein Klick auf den Dateinamen öffnet die Detailseite mit dem erkannten Text und den Kommentaren.
 
 ## Aus welchen Teilen die Anwendung besteht
 
-Beim Start werden 9 Container gestartet:
+Beim Start werden 10 Container gestartet:
 
 - `webui` (Port 80): die Oberfläche. Sie wird von nginx ausgeliefert und leitet alle Aufrufe an `/api` an das Backend weiter.
 - `document-service`: das Backend mit der REST-API. Es hat keinen eigenen Port nach außen, man erreicht es nur über die Oberfläche unter `http://localhost/api`.
 - `ocr-worker`: liest den Text aus den PDFs (mit Ghostscript und Tesseract).
 - `indexing-worker`: trägt den erkannten Text in den Suchindex ein.
+- `genai-worker`: für die Anbindung an Google Gemini. Bisher prüft er nur beim Start, ob die Konfiguration vorhanden ist.
 - `db` (Port 5432): PostgreSQL für Dokumente, Ordner, Kommentare und den erkannten Text. Benutzer und Passwort sind beide `docmanager`.
 - `minio` (Ports 9000 und 9090): speichert die PDF-Dateien. Die Konsole ist unter http://localhost:9090 erreichbar, Benutzer und Passwort sind `minioadmin`.
 - `rabbitmq` (Ports 5672 und 15672): die Nachrichten-Queue zwischen Backend und Workern. Die Verwaltungsseite ist unter http://localhost:15672 erreichbar, Benutzer und Passwort sind `guest`.
@@ -85,8 +99,8 @@ Mit dieser Liste kann man auf einem frischen Stand prüfen, ob alles funktionier
 
 - [ ] `docker compose down -v` ausführen. Bei einem frischen Clone gibt es nichts zu löschen, das ist in Ordnung.
 - [ ] `docker compose build` ausführen. Der Build muss ohne Fehler durchlaufen. Beim ersten Mal dauert das ein paar Minuten.
-- [ ] `docker compose up -d` ausführen. Es werden 9 Container erstellt.
-- [ ] Ein bis zwei Minuten warten und dann `docker compose ps` ausführen. `db`, `minio`, `rabbitmq`, `elasticsearch` und `document-service` müssen `healthy` sein. `ocr-worker`, `indexing-worker`, `webui` und `kibana` müssen laufen (`Up`).
+- [ ] `docker compose up -d` ausführen. Es werden 10 Container erstellt.
+- [ ] Ein bis zwei Minuten warten und dann `docker compose ps` ausführen. `db`, `minio`, `rabbitmq`, `elasticsearch` und `document-service` müssen `healthy` sein. `ocr-worker`, `indexing-worker`, `genai-worker`, `webui` und `kibana` müssen laufen (`Up`).
 - [ ] http://localhost öffnen. Die Übersicht ist leer und zeigt "Noch keine Dokumente."
 - [ ] Auf "PDF hochladen" klicken, `docs/samples/HelloWorld.pdf` auswählen und auf "Hochladen" klicken. Der Dialog schließt sich, und `HelloWorld.pdf` steht mit dem Status "Text wird erkannt..." in der Tabelle.
 - [ ] Die Seite nicht neu laden und ein paar Sekunden warten. Der Status wechselt von selbst auf "Durchsuchbar" (in der API `OCR_DONE`).
@@ -231,6 +245,8 @@ Der `ocr-worker` nutzt dieselben Variablen für RabbitMQ und MinIO. Dazu kommen:
 
 Der `indexing-worker` braucht die Variablen für RabbitMQ sowie `ELASTICSEARCH_URL` und `ELASTICSEARCH_INDEX`.
 
+Der `genai-worker` nutzt `GEMINI_API_KEY` (nötig für Gemini) und `GEMINI_MODEL` (Standard `gemini-3.8-flash`). Ohne Docker liest er die `.env` nicht, dann müssen die Variablen im Terminal gesetzt sein.
+
 Die Namen von Exchange, Queues und Routing-Keys stehen an einer Stelle: `MessagingTopology` im Modul `messaging-contract`.
 
 Das Datenbankschema verwaltet Flyway (`document-service/src/main/resources/db/migration`). Änderungen kommen als neues Skript dazu. Eine ältere Datenbank ohne Flyway wird beim Start automatisch übernommen.
@@ -296,11 +312,12 @@ DocManager/
 ├── document-service/     Backend (Spring Boot, REST-API, Upload, Suche)
 ├── ocr-worker/           liest den Text aus den PDFs
 ├── indexing-worker/      schreibt den Text in Elasticsearch
+├── genai-worker/         Anbindung an Google Gemini
 ├── webui/                Oberfläche (React) mit nginx
 ├── docs/samples/         Beispiel-PDF für Tests und Abnahme
-├── docker-compose.yml    startet alle 9 Container
+├── docker-compose.yml    startet alle 10 Container
 ├── .github/workflows/    CI (Stil, Typen und Tests)
-└── pom.xml               Maven-Projekt für die vier Java-Module
+└── pom.xml               Maven-Projekt für die fünf Java-Module
 ```
 
 Im Backend ist der Code nach Aufgaben getrennt: `controller` (REST), `service` (Logik; Interfaces gibt es nur für Zugriffe nach außen wie Speicher und Suche, die Umsetzung liegt in `impl`), `repository`, `entity`, `dto`, `mapper`, `messaging` (RabbitMQ) und `exception`. In der Oberfläche liegen die Seiten in `pages`, die wiederverwendbaren Teile in `components`, die Aufrufe an das Backend in `api` und die Prüfungen für Eingaben in `validation`.

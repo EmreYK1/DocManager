@@ -1,0 +1,22 @@
+FROM maven:3.9-eclipse-temurin-25 AS build
+WORKDIR /build
+
+# Alle POMs, weil Maven das ganze Projekt einliest, aber nur die benötigten Quellen
+COPY pom.xml .
+COPY messaging-contract/pom.xml messaging-contract/
+COPY document-service/pom.xml document-service/
+COPY ocr-worker/pom.xml ocr-worker/
+COPY indexing-worker/pom.xml indexing-worker/
+COPY genai-worker/pom.xml genai-worker/
+COPY genai-worker/src genai-worker/src
+# Das Maven-Repository bleibt zwischen den Builds im Cache
+RUN --mount=type=cache,target=/root/.m2 mvn -B -q -pl genai-worker -am package -DskipTests
+
+FROM eclipse-temurin:25-jre
+WORKDIR /app
+
+# Nicht als root laufen
+RUN groupadd --system app && useradd --system --gid app --no-create-home app
+COPY --from=build /build/genai-worker/target/genai-worker-*.jar app.jar
+USER app
+ENTRYPOINT ["java", "-jar", "app.jar"]
