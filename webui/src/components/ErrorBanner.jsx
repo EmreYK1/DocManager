@@ -1,4 +1,4 @@
-import { errorMessage } from '../api/errorMessages.js'
+import { errorMessage } from '../api/errorMessages.ts'
 
 export default function ErrorBanner({ error }) {
   if (!error) {

@@ -1,21 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import ConfirmDialog from '../components/ConfirmDialog.jsx'
-import DocumentUploadForm from '../components/DocumentUploadForm.jsx'
+import DashboardDialogs from '../components/DashboardDialogs.jsx'
 import DocumentTable from '../components/DocumentTable.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 import FolderActions from '../components/FolderActions.jsx'
-import FolderForm from '../components/FolderForm.jsx'
 import FolderTree from '../components/FolderTree.jsx'
-import Modal from '../components/Modal.jsx'
-import { deleteDocument, getDocuments, searchDocuments, uploadDocument } from '../api/documentApi.js'
-import { createFolder, deleteFolder, getFolders, updateFolder } from '../api/folderApi.js'
+import { getDocuments } from '../api/documentApi.ts'
+import { getFolders } from '../api/folderApi.ts'
+import { DocumentStatus } from '../constants/documentStatus.js'
 import { useApiResource } from '../hooks/useApiResource.js'
 import { useDialog } from '../hooks/useDialog.js'
-import { OCR_POLL_INTERVAL_MS, useOcrPolling } from '../hooks/useOcrPolling.js'
+import { useDocumentSearch } from '../hooks/useDocumentSearch.js'
+import { usePendingOcrRefresh } from '../hooks/usePendingOcrRefresh.js'
 import { filterDocuments, NO_FOLDER } from '../utils/documentFilter.js'
 import { buildFolderNameMap } from '../utils/folderNames.js'
-import { folderAndDescendantIds, folderPath } from '../utils/folderTree.js'
+import { folderPath } from '../utils/folderTree.js'
 
 function pageTitle(selectedFolder, folderParam) {
   if (selectedFolder) return selectedFolder.name
@@ -25,25 +24,8 @@ function pageTitle(selectedFolder, folderParam) {
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const folderParam = searchParams.get('folder')
-  // `searchInput` ist der Text im Feld, `query` der abgeschickte Suchbegriff.
-  const [searchInput, setSearchInput] = useState('')
-  const [query, setQuery] = useState('')
+  const search = useDocumentSearch()
   const dialog = useDialog()
-
-  // Ergebnis trägt den Suchbegriff mit, damit Treffer einer älteren Suche nie angezeigt werden.
-  const loadSearch = useCallback(
-    () =>
-      query
-        ? searchDocuments(query).then((hits) => ({ query, hits }))
-        : Promise.resolve(null),
-    [query],
-  )
-  const {
-    data: searchResult,
-    loading: searchLoading,
-    error: searchError,
-    reload: reloadSearch,
-  } = useApiResource(loadSearch)
 
   const {
     data: documents,
@@ -68,48 +50,20 @@ export default function DashboardPage() {
     !allFolders.some((folder) => folder.parentId === selectedFolder.id) &&
     !documents.some((doc) => doc.folderId === selectedFolder.id)
 
-  const searching = query !== ''
-  const searchReady = searching && searchResult?.query === query
-  const sourceDocuments = searching ? (searchReady ? searchResult.hits : []) : (documents ?? [])
-
   // Ordnerfilter gilt auch für Suchtreffer.
+  const sourceDocuments = search.active ? search.hits : documents
   const visibleDocuments = useMemo(
-    () => filterDocuments(sourceDocuments, allFolders, folderParam, ''),
+    () => filterDocuments(sourceDocuments ?? [], allFolders, folderParam),
     [sourceDocuments, allFolders, folderParam],
   )
 
   const handleSearch = (event) => {
     event.preventDefault()
-    const next = searchInput.trim()
-    if (next === query && next !== '') reloadSearch()
-    setQuery(next)
+    search.submit()
   }
-
-  const handleResetSearch = () => {
-    setSearchInput('')
-    setQuery('')
-  }
-
-  const handleCreateFolder = (folder) =>
-    dialog.run(async () => {
-      await createFolder(folder)
-      reloadFolders()
-    })
-
-  const handleUpdateFolder = (folder) =>
-    dialog.run(async () => {
-      await updateFolder(selectedFolder.id, folder)
-      reloadFolders()
-    })
-
-  const handleDeleteFolder = () =>
-    dialog.run(async () => {
-      await deleteFolder(selectedFolder.id)
-      setSearchParams({})
-      reloadFolders()
-    })
 
   // Lädt die Gesamtliste und, bei aktiver Suche, auch die angezeigten Treffer neu.
+  const { active: searching, reload: reloadSearch } = search
   const reloadVisible = useCallback(() => {
     reloadDocuments()
     if (searching) reloadSearch()
@@ -123,51 +77,22 @@ export default function DashboardPage() {
     dialog.open('deleteDocument')
   }
 
-  const handleDeleteDocument = () =>
-    dialog.run(async () => {
-      await deleteDocument(documentToDelete.id)
-      reloadVisible()
-    })
-
-  const handleUploadDocument = ({ file, folderId }) =>
-    dialog.run(async () => {
-      await uploadDocument(file, folderId)
-      setUploadNotice(file.name)
-      reloadVisible()
-    })
-
-  // Solange eine OCR läuft, regelmäßig neu laden, damit der Statuswechsel ohne F5 sichtbar wird.
-  const pendingIds = [...(documents ?? []), ...(searchReady ? searchResult.hits : [])]
-    .filter((doc) => doc.status === 'OCR_PENDING')
-    .map((doc) => doc.id)
-  const hasPendingOcr = pendingIds.length > 0
-  const { gaveUp: pollingGaveUp } = useOcrPolling({
-    active: hasPendingOcr,
-    busy: documentsLoading || (searching && searchLoading),
-    failed: Boolean(documentsError || (searching && searchError)),
+  const { gaveUp: pollingGaveUp } = usePendingOcrRefresh({
+    documents: [...(documents ?? []), ...search.hits],
+    search,
+    busy: documentsLoading || search.loading,
+    failed: Boolean(documentsError || search.error),
     reload: reloadVisible,
-    // Wartet ein anderes Dokument als vorher, beginnt das Zeitbudget neu.
-    resetKey: [...new Set(pendingIds)].sort().join(','),
   })
 
-  // Der Suchindex wird erst kurz nach OCR_DONE befüllt: Treffer danach einmal nachladen.
-  const wasPending = useRef(false)
-  useEffect(() => {
-    const finished = wasPending.current && !hasPendingOcr
-    wasPending.current = hasPendingOcr
-    if (!finished || !searching) return undefined
-    const timer = setTimeout(reloadSearch, OCR_POLL_INTERVAL_MS)
-    return () => clearTimeout(timer)
-  }, [hasPendingOcr, searching, reloadSearch])
-
   const path = selectedFolder ? folderPath(allFolders, selectedFolder.id) : []
-  const pendingCount = (documents ?? []).filter((doc) => doc.status === 'OCR_PENDING').length
+  const pendingCount = (documents ?? []).filter((doc) => doc.status === DocumentStatus.OCR_PENDING).length
 
   function renderDocumentList() {
-    if (searching) {
+    if (search.active) {
       // Treffer bleiben sichtbar, auch während sie im Hintergrund neu geladen werden.
-      if (!searchReady) {
-        if (searchError && !searchLoading) return null
+      if (!search.ready) {
+        if (search.error && !search.loading) return null
         return <p className="empty">Suche läuft…</p>
       }
       return (
@@ -175,7 +100,7 @@ export default function DashboardPage() {
           documents={visibleDocuments}
           folderNames={folderNames}
           onDelete={askDeleteDocument}
-          emptyMessage={`Keine Treffer für ${query}`}
+          emptyMessage={`Keine Treffer für ${search.query}`}
           emptyHint="Prüfe die Schreibweise oder versuche ein anderes Wort. Neue Dokumente sind erst durchsuchbar, wenn ihr Text erkannt wurde."
         />
       )
@@ -193,9 +118,9 @@ export default function DashboardPage() {
     )
   }
 
-  const countLabel = searching
-    ? searchReady
-      ? `${visibleDocuments.length} Treffer für „${query}“`
+  const countLabel = search.active
+    ? search.ready
+      ? `${visibleDocuments.length} Treffer für „${search.query}“`
       : ''
     : `${visibleDocuments.length} ${visibleDocuments.length === 1 ? 'Dokument' : 'Dokumente'}`
 
@@ -205,12 +130,12 @@ export default function DashboardPage() {
       <main className="content">
         <ErrorBanner error={documentsError} />
         <ErrorBanner error={foldersError} />
-        {searching && <ErrorBanner error={searchError} />}
+        <ErrorBanner error={search.error} />
         {uploadNotice && (
           <div role="status" className="banner banner-success">
             <p className="banner-message">
-              „{uploadNotice}“ wurde hochgeladen. Der Text wird jetzt erkannt, danach ist das Dokument über die
-              Suche auffindbar.
+              „{uploadNotice}“ wurde hochgeladen. Der Text wird jetzt erkannt, danach ist das Dokument über die Suche
+              auffindbar.
             </p>
             <button
               type="button"
@@ -274,14 +199,14 @@ export default function DashboardPage() {
                 className="search"
                 placeholder="Nach Wörtern im Text oder Dateinamen suchen…"
                 aria-label="Dokumente durchsuchen"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
+                value={search.input}
+                onChange={(event) => search.setInput(event.target.value)}
               />
               <button type="submit" className="btn">
                 Suchen
               </button>
-              {searching && (
-                <button type="button" className="btn" onClick={handleResetSearch}>
+              {search.active && (
+                <button type="button" className="btn" onClick={search.reset}>
                   Suche zurücksetzen
                 </button>
               )}
@@ -292,62 +217,16 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {dialog.current === 'createDocument' && (
-        <Modal title="PDF hochladen" onClose={dialog.close} busy={dialog.busy}>
-          <ErrorBanner error={dialog.error} />
-          <DocumentUploadForm
-            folders={allFolders}
-            initialFolderId={selectedFolder?.id ?? ''}
-            onSubmit={handleUploadDocument}
-            busy={dialog.busy}
-          />
-        </Modal>
-      )}
-      {dialog.current === 'createFolder' && (
-        <Modal title="Neuer Ordner" onClose={dialog.close} busy={dialog.busy}>
-          <ErrorBanner error={dialog.error} />
-          <FolderForm
-            folders={allFolders}
-            initial={{ name: '', parentId: selectedFolder?.id ?? '' }}
-            onSubmit={handleCreateFolder}
-            busy={dialog.busy}
-          />
-        </Modal>
-      )}
-      {dialog.current === 'editFolder' && selectedFolder && (
-        <Modal title="Ordner bearbeiten" onClose={dialog.close} busy={dialog.busy}>
-          <ErrorBanner error={dialog.error} />
-          <FolderForm
-            key={selectedFolder.id}
-            folders={allFolders}
-            excludeIds={folderAndDescendantIds(allFolders, selectedFolder.id)}
-            initial={{ name: selectedFolder.name, parentId: selectedFolder.parentId ?? '' }}
-            submitLabel="Speichern"
-            onSubmit={handleUpdateFolder}
-            busy={dialog.busy}
-          />
-        </Modal>
-      )}
-      {dialog.current === 'deleteFolder' && selectedFolder && (
-        <ConfirmDialog
-          title="Ordner löschen"
-          message={`Ordner „${selectedFolder.name}“ wirklich löschen?`}
-          error={dialog.error}
-          onConfirm={handleDeleteFolder}
-          onCancel={dialog.close}
-          busy={dialog.busy}
-        />
-      )}
-      {dialog.current === 'deleteDocument' && documentToDelete && (
-        <ConfirmDialog
-          title="Dokument löschen"
-          message={`Dokument „${documentToDelete.filename}“ und alle Kommentare wirklich löschen?`}
-          error={dialog.error}
-          onConfirm={handleDeleteDocument}
-          onCancel={dialog.close}
-          busy={dialog.busy}
-        />
-      )}
+      <DashboardDialogs
+        dialog={dialog}
+        folders={allFolders}
+        selectedFolder={selectedFolder}
+        documentToDelete={documentToDelete}
+        onFoldersChanged={reloadFolders}
+        onFolderDeleted={() => setSearchParams({})}
+        onDocumentsChanged={reloadVisible}
+        onUploaded={setUploadNotice}
+      />
     </div>
   )
 }

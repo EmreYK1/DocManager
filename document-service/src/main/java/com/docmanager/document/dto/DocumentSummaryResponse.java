@@ -1,7 +1,6 @@
 package com.docmanager.document.dto;
 
 import com.docmanager.document.entity.DocumentStatus;
-import lombok.Data;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -12,14 +11,12 @@ import java.util.UUID;
  * Sekunden neu, und der Text aller Dokumente zusammen kann sehr groß sein.
  * Den vollständigen Text liefert {@link DocumentResponse} über {@code GET /documents/{id}}.
  */
-@Data
-public class DocumentSummaryResponse {
-    private UUID id;
-    private String filename;
-    private String contentType;
-    private long sizeBytes;
-    private Instant uploadedAt;
-    private DocumentStatus status;
-    private UUID folderId;
-    private String objectKey;
-}
+public record DocumentSummaryResponse(
+        UUID id,
+        String filename,
+        String contentType,
+        long sizeBytes,
+        Instant uploadedAt,
+        DocumentStatus status,
+        UUID folderId,
+        String objectKey) {}

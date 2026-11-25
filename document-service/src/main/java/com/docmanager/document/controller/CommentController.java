@@ -5,8 +5,8 @@ import com.docmanager.document.dto.CommentResponse;
 import com.docmanager.document.dto.CommentUpdateRequest;
 import com.docmanager.document.mapper.CommentMapper;
 import com.docmanager.document.service.CommentService;
-import org.springframework.http.HttpStatus;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,16 +22,12 @@ public class CommentController {
         this.commentService = commentService;
     }
 
-    // POST /documents/{documentId}/comments
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CommentResponse create(@PathVariable UUID documentId,
-                                  @Valid @RequestBody CommentRequest request) {
-        return CommentMapper.toResponse(
-                commentService.save(documentId, request.getContent(), request.getAuthor()));
+    public CommentResponse create(@PathVariable UUID documentId, @Valid @RequestBody CommentRequest request) {
+        return CommentMapper.toResponse(commentService.save(documentId, request.content(), request.author()));
     }
 
-    // GET /documents/{documentId}/comments
     @GetMapping
     public List<CommentResponse> getAllForDocument(@PathVariable UUID documentId) {
         return commentService.findByDocument(documentId).stream()
@@ -39,26 +35,20 @@ public class CommentController {
                 .toList();
     }
 
-    // GET /documents/{documentId}/comments/{id}
     @GetMapping("/{id}")
-    public CommentResponse getOne(@PathVariable UUID documentId,
-                                  @PathVariable UUID id) {
-        return CommentMapper.toResponse(commentService.findById(id));
+    public CommentResponse getOne(@PathVariable UUID documentId, @PathVariable UUID id) {
+        return CommentMapper.toResponse(commentService.findById(documentId, id));
     }
 
-    // PUT /documents/{documentId}/comments/{id}
     @PutMapping("/{id}")
-    public CommentResponse update(@PathVariable UUID documentId,
-                                  @PathVariable UUID id,
-                                  @Valid @RequestBody CommentUpdateRequest request) {
-        return CommentMapper.toResponse(commentService.update(id, request.getContent()));
+    public CommentResponse update(
+            @PathVariable UUID documentId, @PathVariable UUID id, @Valid @RequestBody CommentUpdateRequest request) {
+        return CommentMapper.toResponse(commentService.update(documentId, id, request.content()));
     }
 
-    // DELETE /documents/{documentId}/comments/{id}
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID documentId,
-                       @PathVariable UUID id) {
-        commentService.delete(id);
+    public void delete(@PathVariable UUID documentId, @PathVariable UUID id) {
+        commentService.delete(documentId, id);
     }
 }

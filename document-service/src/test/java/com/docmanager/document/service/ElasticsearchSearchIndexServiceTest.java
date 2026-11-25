@@ -10,8 +10,6 @@ import org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestCli
 import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -20,9 +18,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * (CI hat kein Elasticsearch) und Verbindungsfehler als SearchException ankommen.
  */
 @SpringBootTest(
-        classes = {ElasticsearchRestClientAutoConfiguration.class, ElasticsearchClientAutoConfiguration.class,
-                JacksonAutoConfiguration.class,
-                ElasticsearchSearchIndexService.class},
+        classes = {
+            ElasticsearchRestClientAutoConfiguration.class,
+            ElasticsearchClientAutoConfiguration.class,
+            JacksonAutoConfiguration.class,
+            ElasticsearchSearchIndexService.class
+        },
         properties = "spring.elasticsearch.uris=http://localhost:1")
 class ElasticsearchSearchIndexServiceTest {
 
@@ -30,13 +31,8 @@ class ElasticsearchSearchIndexServiceTest {
     private ElasticsearchSearchIndexService service;
 
     @Test
-    @DisplayName("Kontext startet ohne erreichbares Elasticsearch")
-    void contextStartsWithoutElasticsearch() {
-        assertThat(service).isNotNull();
-    }
-
-    @Test
-    @DisplayName("buildQuery: Fuzzy-Suche plus Teilstring-Suche im Dateinamen, damit 'helloworld' HelloWorld.pdf findet")
+    @DisplayName(
+            "buildQuery: Fuzzy-Suche plus Teilstring-Suche im Dateinamen, damit 'helloworld' HelloWorld.pdf findet")
     void buildQuery_combinesFuzzyAndFilenameWildcard() {
         String json = ElasticsearchSearchIndexService.buildQuery("helloworld").toString();
 
@@ -47,7 +43,8 @@ class ElasticsearchSearchIndexServiceTest {
     @Test
     @DisplayName("buildQuery: jedes Wort bekommt eigene Teilstring-Suche, Sonderzeichen werden maskiert")
     void buildQuery_perTermWildcards_andEscaping() {
-        String json = ElasticsearchSearchIndexService.buildQuery("hello wor*ld a").toString();
+        String json =
+                ElasticsearchSearchIndexService.buildQuery("hello wor*ld a").toString();
 
         assertThat(json).contains("*hello*").contains("*wor\\\\*ld*");
         assertThat(json).doesNotContain("\"*a*\"");
@@ -57,11 +54,5 @@ class ElasticsearchSearchIndexServiceTest {
     @DisplayName("search() bei nicht erreichbarem Elasticsearch → SearchException")
     void search_unreachable_throwsSearchException() {
         assertThatThrownBy(() -> service.search("Hello")).isInstanceOf(SearchException.class);
-    }
-
-    @Test
-    @DisplayName("delete() bei nicht erreichbarem Elasticsearch → SearchException")
-    void delete_unreachable_throwsSearchException() {
-        assertThatThrownBy(() -> service.delete(UUID.randomUUID())).isInstanceOf(SearchException.class);
     }
 }

@@ -3,39 +3,43 @@ package com.docmanager.document.mapper;
 import com.docmanager.document.dto.DocumentResponse;
 import com.docmanager.document.dto.DocumentSummaryResponse;
 import com.docmanager.document.entity.Document;
+import com.docmanager.document.entity.Folder;
 
-public class DocumentMapper {
+import java.util.UUID;
 
-    public static DocumentResponse toResponse(Document document) {
-        DocumentResponse dto = new DocumentResponse();
-        dto.setId(document.getId());
-        dto.setFilename(document.getFilename());
-        dto.setContentType(document.getContentType());
-        dto.setSizeBytes(document.getSizeBytes());
-        dto.setUploadedAt(document.getUploadedAt());
-        dto.setStatus(document.getStatus());
-        dto.setOcrText(document.getOcrText());
-        dto.setSummary(document.getSummary());
-        dto.setObjectKey(document.getObjectKey());
-        if (document.getFolder() != null) {
-            dto.setFolderId(document.getFolder().getId());
-        }
-        return dto;
+public final class DocumentMapper {
+
+    private DocumentMapper() {}
+
+    public static DocumentResponse toResponse(Document d) {
+        return new DocumentResponse(
+                d.getId(),
+                d.getFilename(),
+                d.getContentType(),
+                d.getSizeBytes(),
+                d.getUploadedAt(),
+                d.getStatus(),
+                d.getOcrText(),
+                d.getSummary(),
+                folderId(d),
+                d.getObjectKey());
     }
 
     /** Wie {@link #toResponse}, aber ohne OCR-Text und Zusammenfassung (für Listen und Suche). */
-    public static DocumentSummaryResponse toSummary(Document document) {
-        DocumentSummaryResponse dto = new DocumentSummaryResponse();
-        dto.setId(document.getId());
-        dto.setFilename(document.getFilename());
-        dto.setContentType(document.getContentType());
-        dto.setSizeBytes(document.getSizeBytes());
-        dto.setUploadedAt(document.getUploadedAt());
-        dto.setStatus(document.getStatus());
-        dto.setObjectKey(document.getObjectKey());
-        if (document.getFolder() != null) {
-            dto.setFolderId(document.getFolder().getId());
-        }
-        return dto;
+    public static DocumentSummaryResponse toSummary(Document d) {
+        return new DocumentSummaryResponse(
+                d.getId(),
+                d.getFilename(),
+                d.getContentType(),
+                d.getSizeBytes(),
+                d.getUploadedAt(),
+                d.getStatus(),
+                folderId(d),
+                d.getObjectKey());
+    }
+
+    private static UUID folderId(Document document) {
+        Folder folder = document.getFolder();
+        return folder != null ? folder.getId() : null;
     }
 }

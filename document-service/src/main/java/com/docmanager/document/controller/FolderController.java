@@ -21,7 +21,7 @@ public class FolderController {
 
     @PostMapping
     public FolderResponse create(@Valid @RequestBody FolderRequest request) {
-        return FolderMapper.toResponse(folderService.create(request.getName(), request.getParentId()));
+        return FolderMapper.toResponse(folderService.create(request.name(), request.parentId()));
     }
 
     @GetMapping("/{id}")
@@ -31,9 +31,7 @@ public class FolderController {
 
     @GetMapping
     public List<FolderResponse> getAll() {
-        return folderService.findAll().stream()
-                .map(FolderMapper::toResponse)
-                .toList();
+        return folderService.findAll().stream().map(FolderMapper::toResponse).toList();
     }
 
     @GetMapping("/{id}/children")
@@ -45,7 +43,7 @@ public class FolderController {
 
     @PutMapping("/{id}")
     public FolderResponse update(@PathVariable UUID id, @Valid @RequestBody FolderRequest request) {
-        return FolderMapper.toResponse(folderService.update(id, request.getName(), request.getParentId()));
+        return FolderMapper.toResponse(folderService.update(id, request.name(), request.parentId()));
     }
 
     @DeleteMapping("/{id}")

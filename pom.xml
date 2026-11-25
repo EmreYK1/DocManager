@@ -10,30 +10,102 @@
     <packaging>pom</packaging>
 
     <name>DocManager</name>
-    <description>
-        Monorepo für DocManager: ein Document-Management-System mit OCR,
-        automatischer Zusammenfassung und Volltextsuche.
-    </description>
+    <description>Monorepo für DocManager: ein Document-Management-System mit OCR und Volltextsuche.</description>
 
-    <!--
-        Module werden schrittweise ergänzt:
-          document-service   (REST + DAL)
-          webui               (Web-Frontend, separater Container)
-          ocr-worker
-          genai-worker
-          batch-processor
-    -->
     <modules>
+        <module>messaging-contract</module>
         <module>document-service</module>
         <module>ocr-worker</module>
         <module>indexing-worker</module>
     </modules>
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.0</spring-boot.version>
+        <!-- neuer als die Spring-Boot-Vorgabe, nötig für aktuelle Docker-Versionen -->
+        <testcontainers.version>1.21.4</testcontainers.version>
+        <lombok.version>1.18.38</lombok.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- muss vor den Spring-Boot-Versionen stehen -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.14.0</version>
+                    <configuration>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.3</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <!-- Lombok nicht ins ausführbare JAR packen -->
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <!-- Einheitlicher Java-Stil: "mvn spotless:apply" formatiert, "mvn spotless:check" prüft -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.46.1</version>
+                <configuration>
+                    <java>
+                        <palantirJavaFormat>
+                            <version>2.80.0</version>
+                        </palantirJavaFormat>
+                        <removeUnusedImports/>
+                        <importOrder>
+                            <order>,javax|java,\#</order>
+                        </importOrder>
+                    </java>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

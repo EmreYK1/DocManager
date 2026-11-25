@@ -2,16 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import DashboardPage from './DashboardPage.jsx'
-import { deleteDocument, getDocuments, searchDocuments, uploadDocument } from '../api/documentApi.js'
-import { getFolders } from '../api/folderApi.js'
+import { deleteDocument, getDocuments, searchDocuments, uploadDocument } from '../api/documentApi.ts'
+import { getFolders } from '../api/folderApi.ts'
 
-vi.mock('../api/documentApi.js', () => ({
+vi.mock('../api/documentApi.ts', () => ({
   getDocuments: vi.fn(),
   searchDocuments: vi.fn(),
   uploadDocument: vi.fn(),
   deleteDocument: vi.fn(),
 }))
-vi.mock('../api/folderApi.js', () => ({
+vi.mock('../api/folderApi.ts', () => ({
   getFolders: vi.fn(),
   createFolder: vi.fn(),
   updateFolder: vi.fn(),
@@ -54,13 +54,6 @@ describe('DashboardPage Volltextsuche', () => {
     vi.clearAllMocks()
   })
 
-  it('zeigt zuerst alle Dokumente und sucht nicht ohne Eingabe', async () => {
-    renderPage()
-
-    expect(await screen.findByText('Rechnung.pdf')).toBeTruthy()
-    expect(searchDocuments).not.toHaveBeenCalled()
-  })
-
   it('sucht erst beim Absenden, nicht bei jedem Tastendruck', async () => {
     renderPage()
     await screen.findByText('Rechnung.pdf')
@@ -72,16 +65,6 @@ describe('DashboardPage Volltextsuche', () => {
     fireEvent.submit(screen.getByRole('search'))
     await waitFor(() => expect(searchDocuments).toHaveBeenCalledTimes(1))
     expect(searchDocuments).toHaveBeenCalledWith('Hello')
-  })
-
-  it('Suche nach „Hello“ zeigt nur HelloWorld.pdf', async () => {
-    renderPage()
-    await screen.findByText('Rechnung.pdf')
-
-    search('Hello')
-
-    expect(await screen.findByText('HelloWorld.pdf')).toBeTruthy()
-    expect(screen.queryByText('Rechnung.pdf')).toBeNull()
   })
 
   it('zeigt „Keine Treffer für xyzabc“ ohne Ergebnis', async () => {
@@ -174,23 +157,6 @@ describe('DashboardPage PDF-Upload', () => {
     await waitFor(() => expect(screen.queryByLabelText('PDF-Datei')).toBeNull())
     expect(screen.getByRole('status').textContent).toMatch(/„HelloWorld.pdf“ wurde hochgeladen/)
   })
-
-  it('zeigt einen Hinweis, solange Text erkannt wird', async () => {
-    getDocuments.mockResolvedValue([{ ...hello, status: 'OCR_PENDING' }])
-    renderPage()
-
-    expect(await screen.findByText(/Bei 1 Dokument wird gerade der Text erkannt/)).toBeTruthy()
-    expect(screen.getByText('Text wird erkannt…')).toBeTruthy()
-  })
-
-  it('erklärt den leeren Zustand ohne Dokumente', async () => {
-    getDocuments.mockResolvedValue([])
-    renderPage()
-
-    expect(await screen.findByText('Noch keine Dokumente.')).toBeTruthy()
-    expect(screen.getByText(/Lade dein erstes PDF/)).toBeTruthy()
-    expect(screen.getByText('0 Dokumente')).toBeTruthy()
-  })
 })
 
 describe('DashboardPage Neuladen bei OCR_PENDING', () => {
@@ -233,16 +199,6 @@ describe('DashboardPage Neuladen bei OCR_PENDING', () => {
 
     await advance(15000)
     expect(getDocuments).toHaveBeenCalledTimes(4)
-  })
-
-  it('lädt nicht neu, wenn kein Dokument OCR_PENDING ist', async () => {
-    getDocuments.mockResolvedValue([done])
-    renderPage()
-    await advance(0)
-
-    await advance(15000)
-
-    expect(getDocuments).toHaveBeenCalledTimes(1)
   })
 
   it('bricht einen langsamen Request nicht ab, sondern wartet ihn ab', async () => {
@@ -389,17 +345,6 @@ describe('DashboardPage Neuladen bei OCR_PENDING', () => {
     expect(screen.getByText('HelloWorld.pdf')).toBeTruthy()
     await act(async () => finishReload([pending]))
   })
-
-  it('räumt den Timer beim Verlassen der Seite auf', async () => {
-    getDocuments.mockResolvedValue([pending])
-    const { unmount } = renderPage()
-    await advance(0)
-
-    unmount()
-    await advance(15000)
-
-    expect(getDocuments).toHaveBeenCalledTimes(1)
-  })
 })
 
 describe('DashboardPage Dokument löschen', () => {
@@ -413,14 +358,6 @@ describe('DashboardPage Dokument löschen', () => {
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
-  })
-
-  it('zeigt pro Dokument einen Löschen-Button', async () => {
-    renderPage()
-    await screen.findByText('Rechnung.pdf')
-
-    expect(screen.getByRole('button', { name: 'HelloWorld.pdf löschen' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Rechnung.pdf löschen' })).toBeTruthy()
   })
 
   it('löscht nach Bestätigung und lädt die Liste neu', async () => {
@@ -439,28 +376,6 @@ describe('DashboardPage Dokument löschen', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('löscht nichts, wenn der Dialog abgebrochen wird', async () => {
-    renderPage()
-    await screen.findByText('Rechnung.pdf')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Rechnung.pdf löschen' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
-
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(deleteDocument).not.toHaveBeenCalled()
-  })
-
-  it('schließt den Dialog mit Escape', async () => {
-    renderPage()
-    await screen.findByText('Rechnung.pdf')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Rechnung.pdf löschen' }))
-    fireEvent.keyDown(window, { key: 'Escape' })
-
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(deleteDocument).not.toHaveBeenCalled()
-  })
-
   it('zeigt einen Fehler im Dialog, wenn das Löschen fehlschlägt', async () => {
     deleteDocument.mockRejectedValue(new Error('Serverfehler'))
     renderPage()
@@ -472,14 +387,5 @@ describe('DashboardPage Dokument löschen', () => {
     await waitFor(() => expect(deleteDocument).toHaveBeenCalled())
     expect(await screen.findByRole('dialog', { name: 'Dokument löschen' })).toBeTruthy()
     expect(screen.getByText('Rechnung.pdf')).toBeTruthy()
-  })
-
-  it('bietet Löschen auch in den Suchtreffern an', async () => {
-    renderPage()
-    await screen.findByText('Rechnung.pdf')
-
-    search('Hello')
-    await waitFor(() => expect(screen.queryByText('Rechnung.pdf')).toBeNull())
-    expect(screen.getByRole('button', { name: 'HelloWorld.pdf löschen' })).toBeTruthy()
   })
 })

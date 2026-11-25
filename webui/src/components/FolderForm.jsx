@@ -2,7 +2,6 @@ import { useState } from 'react'
 import FolderSelect from './FolderSelect.jsx'
 import TextField from './TextField.jsx'
 import { useTextField } from '../hooks/useTextField.js'
-import { resetAfterSubmit } from '../utils/afterSubmit.js'
 
 export default function FolderForm({
   folders = [],
@@ -10,7 +9,6 @@ export default function FolderForm({
   initial = { name: '', parentId: '' },
   excludeIds,
   submitLabel = 'Ordner anlegen',
-  onCancel,
   busy = false,
 }) {
   const name = useTextField('Ordnername', initial.name)
@@ -19,11 +17,7 @@ export default function FolderForm({
   function handleSubmit(event) {
     event.preventDefault()
     if (name.error) return
-    const result = onSubmit({ name: name.value.trim(), parentId: parentId || null })
-    resetAfterSubmit(result, () => {
-      name.reset()
-      setParentId(initial.parentId ?? '')
-    })
+    onSubmit({ name: name.value.trim(), parentId: parentId || null })
   }
 
   return (
@@ -38,11 +32,6 @@ export default function FolderForm({
         emptyLabel="– kein Elternordner –"
       />
       <div className="form-actions">
-        {onCancel && (
-          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
-            Abbrechen
-          </button>
-        )}
         <button type="submit" className="btn btn-primary" disabled={Boolean(name.error) || busy}>
           {submitLabel}
         </button>

@@ -8,9 +8,10 @@ import DocumentMetadata from '../components/DocumentMetadata.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 import Modal from '../components/Modal.jsx'
 import RecognizedText from '../components/RecognizedText.jsx'
-import { deleteDocument, getDocument, updateDocument } from '../api/documentApi.js'
-import { createComment, deleteComment, getComments, updateComment } from '../api/commentApi.js'
-import { getFolders } from '../api/folderApi.js'
+import { deleteDocument, getDocument, updateDocument } from '../api/documentApi.ts'
+import { createComment, deleteComment, getComments, updateComment } from '../api/commentApi.ts'
+import { getFolders } from '../api/folderApi.ts'
+import { DocumentStatus } from '../constants/documentStatus.js'
 import { useApiResource } from '../hooks/useApiResource.js'
 import { useDialog } from '../hooks/useDialog.js'
 import { useOcrPolling } from '../hooks/useOcrPolling.js'
@@ -38,7 +39,7 @@ export default function DocumentDetailPage() {
 
   // Während der Texterkennung neu laden, damit Status und erkannter Text ohne F5 erscheinen.
   useOcrPolling({
-    active: document?.status === 'OCR_PENDING',
+    active: document?.status === DocumentStatus.OCR_PENDING,
     busy: documentLoading,
     failed: Boolean(documentError),
     reload: reloadDocument,

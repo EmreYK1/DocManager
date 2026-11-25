@@ -1,4 +1,11 @@
-export const DOCUMENT_STATUSES = ['UPLOADED', 'OCR_PENDING', 'OCR_DONE', 'SUMMARY_DONE', 'FAILED']
+// Status-Werte des Backends
+export const DocumentStatus = Object.freeze({
+  UPLOADED: 'UPLOADED',
+  OCR_PENDING: 'OCR_PENDING',
+  OCR_DONE: 'OCR_DONE',
+  SUMMARY_DONE: 'SUMMARY_DONE',
+  FAILED: 'FAILED',
+})
 
 // Verständliche Texte zu den technischen Status-Werten des Backends.
 export const STATUS_INFO = {

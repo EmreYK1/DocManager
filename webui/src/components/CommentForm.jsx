@@ -1,20 +1,19 @@
 import TextField from './TextField.jsx'
 import { useTextField } from '../hooks/useTextField.js'
-import { resetAfterSubmit } from '../utils/afterSubmit.js'
 
 export default function CommentForm({ onSubmit }) {
   const author = useTextField('Autor')
   const content = useTextField('Kommentar')
   const hasError = Boolean(author.error || content.error)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     if (hasError) return
-    const result = onSubmit({ author: author.value.trim(), content: content.value.trim() })
-    resetAfterSubmit(result, () => {
-      author.reset()
-      content.reset()
-    })
+    // Bei `false` (Speichern fehlgeschlagen) bleibt die Eingabe erhalten
+    const saved = await onSubmit({ author: author.value.trim(), content: content.value.trim() })
+    if (saved === false) return
+    author.reset()
+    content.reset()
   }
 
   return (

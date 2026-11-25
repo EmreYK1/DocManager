@@ -24,8 +24,7 @@ public class ProcessRunner {
      * @param stderr   Fehlerausgabe
      * @param timedOut true, wenn der Prozess wegen Timeout abgebrochen wurde
      */
-    public record Result(int exitCode, String stdout, String stderr, boolean timedOut) {
-    }
+    public record Result(int exitCode, String stdout, String stderr, boolean timedOut) {}
 
     public Result run(List<String> command, Duration timeout) throws IOException, InterruptedException {
         Process process = new ProcessBuilder(command).start();

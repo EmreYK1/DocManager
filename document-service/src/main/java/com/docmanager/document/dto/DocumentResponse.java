@@ -1,20 +1,18 @@
 package com.docmanager.document.dto;
 
 import com.docmanager.document.entity.DocumentStatus;
-import lombok.Data;
+
 import java.time.Instant;
 import java.util.UUID;
 
-@Data
-public class DocumentResponse {
-    private UUID id;
-    private String filename;
-    private String contentType;
-    private long sizeBytes;
-    private Instant uploadedAt;
-    private DocumentStatus status;
-    private String ocrText;
-    private String summary;
-    private UUID folderId;
-    private String objectKey;
-}
+public record DocumentResponse(
+        UUID id,
+        String filename,
+        String contentType,
+        long sizeBytes,
+        Instant uploadedAt,
+        DocumentStatus status,
+        String ocrText,
+        String summary,
+        UUID folderId,
+        String objectKey) {}

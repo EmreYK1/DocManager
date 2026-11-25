@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -12,7 +11,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "comments")
 @Getter
-@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Comment {
 
@@ -38,5 +36,9 @@ public class Comment {
         this.author = author;
         this.document = document;
         this.createdAt = Instant.now();
+    }
+
+    public void edit(String newContent) {
+        this.content = newContent;
     }
 }

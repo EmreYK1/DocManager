@@ -20,8 +20,7 @@ public class MinioStorageService implements StorageService {
     private final MinioClient minioClient;
     private final String bucket;
 
-    public MinioStorageService(MinioClient minioClient,
-                               @Value("${app.minio.bucket}") String bucket) {
+    public MinioStorageService(MinioClient minioClient, @Value("${app.minio.bucket}") String bucket) {
         this.minioClient = minioClient;
         this.bucket = bucket;
     }
@@ -30,22 +29,13 @@ public class MinioStorageService implements StorageService {
     public String store(MultipartFile file) {
         String filename = file.getOriginalFilename();
         String objectKey = UUID.randomUUID() + (filename != null && !filename.isBlank() ? "-" + filename : ".pdf");
-        store(objectKey, file);
-        return objectKey;
-    }
-
-    @Override
-    public void store(String objectKey, MultipartFile file) {
         try (InputStream inputStream = file.getInputStream()) {
             minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(bucket)
-                            .object(objectKey)
-                            .stream(inputStream, file.getSize(), -1)
+                    PutObjectArgs.builder().bucket(bucket).object(objectKey).stream(inputStream, file.getSize(), -1)
                             .contentType(file.getContentType())
-                            .build()
-            );
+                            .build());
             log.info("Datei erfolgreich in MinIO gespeichert: bucket={}, objectKey={}", bucket, objectKey);
+            return objectKey;
         } catch (Exception e) {
             log.error("Fehler beim Speichern der Datei in MinIO: bucket={}, objectKey={}", bucket, objectKey, e);
             throw new StorageException("Datei konnte nicht in MinIO gespeichert werden", e);
@@ -56,11 +46,7 @@ public class MinioStorageService implements StorageService {
     public void delete(String objectKey) {
         try {
             minioClient.removeObject(
-                    RemoveObjectArgs.builder()
-                            .bucket(bucket)
-                            .object(objectKey)
-                            .build()
-            );
+                    RemoveObjectArgs.builder().bucket(bucket).object(objectKey).build());
             log.info("Datei erfolgreich aus MinIO gelöscht: bucket={}, objectKey={}", bucket, objectKey);
         } catch (Exception e) {
             log.error("Fehler beim Löschen der Datei aus MinIO: bucket={}, objectKey={}", bucket, objectKey, e);
@@ -68,4 +54,3 @@ public class MinioStorageService implements StorageService {
         }
     }
 }
-

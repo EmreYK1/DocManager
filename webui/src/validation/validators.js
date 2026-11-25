@@ -27,14 +27,6 @@ export function requirePdf(file, fieldName) {
   return null
 }
 
-export function nonNegativeInteger(value, fieldName) {
-  const text = typeof value === 'string' ? value.trim() : ''
-  if (text === '' || !Number.isInteger(Number(text)) || Number(text) < 0) {
-    return `${fieldName} muss eine ganze Zahl ab 0 sein.`
-  }
-  return null
-}
-
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 export function maxFileSize(file, fieldName, maxBytes = MAX_UPLOAD_BYTES) {

@@ -4,7 +4,6 @@ import com.docmanager.document.entity.Comment;
 import com.docmanager.document.entity.Document;
 import com.docmanager.document.exception.NotFoundException;
 import com.docmanager.document.repository.CommentRepository;
-import com.docmanager.document.service.impl.CommentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,8 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,7 +30,7 @@ class CommentServiceTest {
     private DocumentService documentService;
 
     @InjectMocks
-    private CommentServiceImpl commentService;
+    private CommentService commentService;
 
     private Document sampleDoc;
     private Comment sampleComment;
@@ -39,64 +38,18 @@ class CommentServiceTest {
     private UUID commentId;
 
     @BeforeEach
-    void setUp() throws Exception {
-        docId     = UUID.randomUUID();
+    void setUp() {
+        docId = UUID.randomUUID();
         commentId = UUID.randomUUID();
 
-        sampleDoc = new Document("test.pdf", "application/pdf", 1024L, null);
-        setField(Document.class, sampleDoc, "id", docId);
+        sampleDoc = new Document("test.pdf", "application/pdf", 1024L, null, null);
+        ReflectionTestUtils.setField(sampleDoc, "id", docId);
 
         sampleComment = new Comment("Sehr gutes Dokument", "Alice", sampleDoc);
-        setField(Comment.class, sampleComment, "id", commentId);
-    }
-
-    private <T> void setField(Class<T> clazz, T obj, String fieldName, Object value) throws Exception {
-        var field = clazz.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(obj, value);
-    }
-
-    // ─── save ────────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("save() lädt Document per ID und speichert Comment")
-    void save_loadsDocumentAndPersistsComment() {
-        when(documentService.findById(docId)).thenReturn(sampleDoc);
-        when(commentRepository.save(any(Comment.class))).thenReturn(sampleComment);
-
-        Comment result = commentService.save(docId, "Sehr gutes Dokument", "Alice");
-
-        assertThat(result.getContent()).isEqualTo("Sehr gutes Dokument");
-        assertThat(result.getAuthor()).isEqualTo("Alice");
-        assertThat(result.getDocument()).isEqualTo(sampleDoc);
-        verify(documentService).findById(docId);
-        verify(commentRepository).save(any(Comment.class));
-    }
-
-    @Test
-    @DisplayName("save() wirft NotFoundException wenn Document nicht existiert")
-    void save_throwsNotFoundException_whenDocumentNotFound() {
-        UUID unknownId = UUID.randomUUID();
-        when(documentService.findById(unknownId)).thenThrow(new NotFoundException("Document not found: " + unknownId));
-
-        assertThatThrownBy(() -> commentService.save(unknownId, "Text", "Bob"))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Document not found");
-
-        verify(commentRepository, never()).save(any());
+        ReflectionTestUtils.setField(sampleComment, "id", commentId);
     }
 
     // ─── findById ────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("findById() gibt Comment zurück wenn vorhanden")
-    void findById_returnsComment_whenFound() {
-        when(commentRepository.findById(commentId)).thenReturn(Optional.of(sampleComment));
-
-        Comment result = commentService.findById(commentId);
-
-        assertThat(result).isEqualTo(sampleComment);
-    }
 
     @Test
     @DisplayName("findById() wirft NotFoundException wenn nicht gefunden")
@@ -104,73 +57,47 @@ class CommentServiceTest {
         UUID unknownId = UUID.randomUUID();
         when(commentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> commentService.findById(unknownId))
+        assertThatThrownBy(() -> commentService.findById(docId, unknownId))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Comment not found");
-    }
-
-    // ─── findByDocument ──────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("findByDocument() gibt alle Comments eines Dokuments zurück")
-    void findByDocument_returnsComments() {
-        Comment c2 = new Comment("Zweiter Kommentar", "Bob", sampleDoc);
-        when(documentService.findById(docId)).thenReturn(sampleDoc);
-        when(commentRepository.findByDocument(sampleDoc)).thenReturn(List.of(sampleComment, c2));
-
-        List<Comment> result = commentService.findByDocument(docId);
-
-        assertThat(result).hasSize(2).containsExactlyInAnyOrder(sampleComment, c2);
-        verify(commentRepository).findByDocument(sampleDoc);
-    }
-
-    @Test
-    @DisplayName("findByDocument() gibt leere Liste zurück wenn keine Comments existieren")
-    void findByDocument_returnsEmptyList_whenNoComments() {
-        when(documentService.findById(docId)).thenReturn(sampleDoc);
-        when(commentRepository.findByDocument(sampleDoc)).thenReturn(List.of());
-
-        List<Comment> result = commentService.findByDocument(docId);
-
-        assertThat(result).isEmpty();
+                .hasMessageContaining("Kommentar nicht gefunden");
     }
 
     // ─── update ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("update() ändert den Content und speichert")
+    @DisplayName("update() ändert den Content")
     void update_updatesContentAndSaves() {
         when(commentRepository.findById(commentId)).thenReturn(Optional.of(sampleComment));
-        when(commentRepository.save(any(Comment.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Comment result = commentService.update(commentId, "Geänderter Inhalt");
+        Comment result = commentService.update(docId, commentId, "Geänderter Inhalt");
 
         assertThat(result.getContent()).isEqualTo("Geänderter Inhalt");
-        verify(commentRepository).save(sampleComment);
-    }
-
-    @Test
-    @DisplayName("update() wirft NotFoundException wenn Comment nicht existiert")
-    void update_throwsNotFoundException_whenNotFound() {
-        UUID unknownId = UUID.randomUUID();
-        when(commentRepository.findById(unknownId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> commentService.update(unknownId, "Text"))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Comment not found");
-
-        verify(commentRepository, never()).save(any());
     }
 
     // ─── delete ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("delete() ruft repository.deleteById() mit korrekter ID auf")
-    void delete_callsDeleteById() {
-        doNothing().when(commentRepository).deleteById(commentId);
+    @DisplayName("delete() löscht den Comment des Dokuments")
+    void delete_deletesComment() {
+        when(commentRepository.findById(commentId)).thenReturn(Optional.of(sampleComment));
 
-        commentService.delete(commentId);
+        commentService.delete(docId, commentId);
 
-        verify(commentRepository, times(1)).deleteById(commentId);
+        verify(commentRepository).delete(sampleComment);
+    }
+
+    @Test
+    @DisplayName("Ein Comment ist über ein fremdes Dokument nicht erreichbar")
+    void foreignDocument_throwsNotFoundException() {
+        UUID otherDocId = UUID.randomUUID();
+        when(commentRepository.findById(commentId)).thenReturn(Optional.of(sampleComment));
+
+        assertThatThrownBy(() -> commentService.findById(otherDocId, commentId)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> commentService.update(otherDocId, commentId, "Text"))
+                .isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> commentService.delete(otherDocId, commentId)).isInstanceOf(NotFoundException.class);
+
+        verify(commentRepository, never()).save(any());
+        verify(commentRepository, never()).delete(any(Comment.class));
     }
 }

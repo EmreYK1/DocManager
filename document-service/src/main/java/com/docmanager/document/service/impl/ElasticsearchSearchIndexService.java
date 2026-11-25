@@ -27,8 +27,8 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
     private final ElasticsearchClient client;
     private final String indexName;
 
-    public ElasticsearchSearchIndexService(ElasticsearchClient client,
-                                           @Value("${app.elasticsearch.index:documents}") String indexName) {
+    public ElasticsearchSearchIndexService(
+            ElasticsearchClient client, @Value("${app.elasticsearch.index:documents}") String indexName) {
         this.client = client;
         this.indexName = indexName;
     }
@@ -36,11 +36,8 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
     @Override
     public List<UUID> search(String query) {
         try {
-            SearchResponse<Void> response = client.search(s -> s
-                            .index(indexName)
-                            .size(MAX_HITS)
-                            .query(buildQuery(query)),
-                    Void.class);
+            SearchResponse<Void> response =
+                    client.search(s -> s.index(indexName).size(MAX_HITS).query(buildQuery(query)), Void.class);
             return response.hits().hits().stream()
                     .map(Hit::id)
                     .map(ElasticsearchSearchIndexService::parseId)
@@ -59,17 +56,13 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
     public static Query buildQuery(String query) {
         BoolQuery.Builder bool = new BoolQuery.Builder()
                 .minimumShouldMatch("1")
-                .should(s -> s.multiMatch(MultiMatchQuery.of(m -> m
-                        .query(query)
-                        .fields("content", "filename")
-                        .fuzziness("AUTO"))));
+                .should(s -> s.multiMatch(MultiMatchQuery.of(
+                        m -> m.query(query).fields("content", "filename").fuzziness("AUTO"))));
         for (String term : query.trim().split("\\s+")) {
             if (term.length() >= MIN_WILDCARD_TERM_LENGTH) {
                 String pattern = "*" + escapeWildcard(term) + "*";
-                bool.should(s -> s.wildcard(w -> w
-                        .field("filename")
-                        .value(pattern)
-                        .caseInsensitive(true)));
+                bool.should(
+                        s -> s.wildcard(w -> w.field("filename").value(pattern).caseInsensitive(true)));
             }
         }
         return Query.of(q -> q.bool(bool.build()));
@@ -77,16 +70,6 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
 
     private static String escapeWildcard(String term) {
         return term.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?");
-    }
-
-    @Override
-    public void delete(UUID documentId) {
-        try {
-            client.delete(d -> d.index(indexName).id(documentId.toString()));
-            log.info("Index-Eintrag gelöscht: id={}", documentId);
-        } catch (IOException | RuntimeException e) {
-            throw new SearchException("Löschen im Elasticsearch-Index fehlgeschlagen: " + documentId, e);
-        }
     }
 
     private static UUID parseId(String id) {

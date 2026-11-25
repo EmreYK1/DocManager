@@ -12,16 +12,11 @@ const documents = [
 ]
 
 describe('filterDocuments', () => {
-  it('liefert ohne Filter alle Dokumente', () => {
-    expect(filterDocuments(documents, folders, null, '')).toHaveLength(3)
-  })
-
   it('enthält beim Ordnerfilter auch Unterordner', () => {
-    expect(filterDocuments(documents, folders, 'a', '').map((d) => d.id)).toEqual(['1', '3'])
+    expect(filterDocuments(documents, folders, 'a').map((d) => d.id)).toEqual(['1', '3'])
   })
 
-  it('findet Dokumente ohne Ordner und filtert nach Dateiname ohne Beachtung der Schreibweise', () => {
-    expect(filterDocuments(documents, folders, 'none', '').map((d) => d.id)).toEqual(['2'])
-    expect(filterDocuments(documents, folders, null, ' BERICHT ').map((d) => d.id)).toEqual(['1'])
+  it('filtert auf Dokumente ohne Ordner', () => {
+    expect(filterDocuments(documents, folders, 'none').map((d) => d.id)).toEqual(['2'])
   })
 })

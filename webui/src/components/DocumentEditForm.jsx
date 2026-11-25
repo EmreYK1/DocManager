@@ -1,20 +1,16 @@
 import { useState } from 'react'
 import FolderSelect from './FolderSelect.jsx'
 import TextField from './TextField.jsx'
-import { DOCUMENT_STATUSES, statusInfo } from '../constants/documentStatus.js'
 import { useTextField } from '../hooks/useTextField.js'
 
 export default function DocumentEditForm({ document, folders = [], onSave, onCancel, busy = false }) {
-  // Werte beim Öffnen merken. Lädt die Seite im Hintergrund neu (z. B. weil die Texterkennung
-  // fertig wurde), darf das Speichern den neuen Status nicht mit dem alten überschreiben.
+  // Werte beim Öffnen merken: Lädt die Seite im Hintergrund neu, zählt nur, was hier geändert wurde.
   const [initial] = useState(() => ({
     filename: document.filename,
-    status: document.status,
     folderId: document.folderId ?? '',
   }))
 
   const filename = useTextField('Dateiname', initial.filename)
-  const [status, setStatus] = useState(initial.status)
   const [folderId, setFolderId] = useState(initial.folderId)
 
   function handleSubmit(event) {
@@ -24,9 +20,6 @@ export default function DocumentEditForm({ document, folders = [], onSave, onCan
     const changes = {}
     if (filename.value.trim() !== initial.filename) {
       changes.filename = filename.value.trim()
-    }
-    if (status !== initial.status) {
-      changes.status = status
     }
     if (folderId !== initial.folderId) {
       if (folderId === '') {
@@ -42,17 +35,6 @@ export default function DocumentEditForm({ document, folders = [], onSave, onCan
   return (
     <form onSubmit={handleSubmit} className="form">
       <TextField label="Dateiname" field={filename} />
-      <label className="field">
-        Status
-        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          {DOCUMENT_STATUSES.map((value) => (
-            <option key={value} value={value}>
-              {statusInfo(value).label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="form-hint">Der Status wird normalerweise automatisch gesetzt. Ändere ihn nur, wenn nötig.</p>
       <FolderSelect
         label="Ordner"
         value={folderId}

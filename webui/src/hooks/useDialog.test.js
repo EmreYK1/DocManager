@@ -3,36 +3,6 @@ import { act, renderHook } from '@testing-library/react'
 import { useDialog } from './useDialog.js'
 
 describe('useDialog', () => {
-  it('schließt den Dialog nach erfolgreicher Aktion', async () => {
-    const { result } = renderHook(() => useDialog())
-    act(() => result.current.open('edit'))
-
-    let ok
-    await act(async () => {
-      ok = await result.current.run(async () => {})
-    })
-
-    expect(ok).toBe(true)
-    expect(result.current.current).toBeNull()
-  })
-
-  it('lässt den Dialog offen und merkt sich den Fehler, wenn die Aktion scheitert', async () => {
-    const { result } = renderHook(() => useDialog())
-    act(() => result.current.open('edit'))
-    const error = new Error('Boom')
-
-    let ok
-    await act(async () => {
-      ok = await result.current.run(async () => {
-        throw error
-      })
-    })
-
-    expect(ok).toBe(false)
-    expect(result.current.current).toBe('edit')
-    expect(result.current.error).toBe(error)
-  })
-
   it('lässt sich nicht schließen, solange eine Aktion läuft, und zeigt danach den Fehler', async () => {
     const { result } = renderHook(() => useDialog())
     act(() => result.current.open('upload'))

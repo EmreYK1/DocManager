@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
@@ -40,12 +41,13 @@ class CommentControllerTest {
         UUID documentId = UUID.randomUUID();
         UUID commentId = UUID.randomUUID();
 
-        Document document = new Document("HelloWorld.pdf", "application/pdf", 12L, null);
-        document.setId(documentId);
+        Document document = new Document("HelloWorld.pdf", "application/pdf", 12L, null, null);
+        ReflectionTestUtils.setField(document, "id", documentId);
         Comment comment = new Comment("Aktualisierter Text", "Max", document);
-        comment.setId(commentId);
+        ReflectionTestUtils.setField(comment, "id", commentId);
 
-        when(commentService.update(eq(commentId), eq("Aktualisierter Text"))).thenReturn(comment);
+        when(commentService.update(eq(documentId), eq(commentId), eq("Aktualisierter Text")))
+                .thenReturn(comment);
 
         mockMvc.perform(put("/documents/{documentId}/comments/{id}", documentId, commentId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -57,7 +59,7 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$.content").value("Aktualisierter Text"))
                 .andExpect(jsonPath("$.author").value("Max"));
 
-        verify(commentService).update(commentId, "Aktualisierter Text");
+        verify(commentService).update(documentId, commentId, "Aktualisierter Text");
     }
 
     @Test
@@ -75,6 +77,6 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.fields.content").exists());
 
-        verify(commentService, never()).update(any(), any());
+        verify(commentService, never()).update(any(), any(), any());
     }
 }

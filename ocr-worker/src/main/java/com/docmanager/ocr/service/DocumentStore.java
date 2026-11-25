@@ -11,9 +11,4 @@ public interface DocumentStore {
      * @return InputStream des Dokuments
      */
     InputStream loadDocument(String objectKey);
-
-    default InputStream load(String objectKey) {
-        return loadDocument(objectKey);
-    }
 }
-

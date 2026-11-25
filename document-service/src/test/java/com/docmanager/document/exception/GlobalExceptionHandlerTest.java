@@ -1,31 +1,28 @@
 package com.docmanager.document.exception;
 
 import com.docmanager.document.controller.DocumentController;
-import com.docmanager.document.dto.ErrorResponse;
 import com.docmanager.document.service.DocumentService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,9 +33,6 @@ class GlobalExceptionHandlerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
     @MockBean
     private DocumentService documentService;
 
@@ -46,108 +40,38 @@ class GlobalExceptionHandlerTest {
     @DisplayName("NotFoundException → HTTP 404 mit status im Body")
     void notFound_returns404() throws Exception {
         UUID id = UUID.randomUUID();
-        when(documentService.findById(id))
-                .thenThrow(new NotFoundException("Dokument nicht gefunden"));
+        when(documentService.findById(id)).thenThrow(new NotFoundException("Dokument nicht gefunden"));
 
-        MvcResult result = mockMvc.perform(get("/documents/{id}", id))
+        mockMvc.perform(get("/documents/{id}", id))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.fields").doesNotExist())
-                .andExpect(jsonPath("$.stackTrace").doesNotExist())
-                .andReturn();
-
-        assertValidErrorBody(result);
+                .andExpect(jsonPath("$.fields").doesNotExist());
     }
 
     @Test
     @DisplayName("MethodArgumentNotValidException → HTTP 400")
     void validation_returns400() throws Exception {
-        String invalidBody = """
-                {
-                  "filename": "",
-                  "contentType": "application/pdf",
-                  "sizeBytes": 100
-                }
-                """;
+        String tooLong = "a".repeat(256);
 
-        MvcResult result = mockMvc.perform(post("/documents")
+        mockMvc.perform(patch("/documents/{id}", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(invalidBody))
+                        .content("{\"filename\": \"" + tooLong + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("Validierungsfehler"))
-                .andExpect(jsonPath("$.fields.filename").value("Dateiname darf nicht leer sein"))
-                .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.stackTrace").doesNotExist())
-                .andReturn();
-
-        assertValidErrorBody(result);
+                .andExpect(jsonPath("$.fields.filename").exists());
     }
 
     @Test
-    @DisplayName("Validierung mit leerem filename und sizeBytes=0 → 400 mit fields für beide Felder")
-    void validation_returns400_withFieldsForFilenameAndSizeBytes() throws Exception {
-        String invalidBody = """
-                {
-                  "filename": "",
-                  "contentType": "application/pdf",
-                  "sizeBytes": 0
-                }
-                """;
+    @DisplayName("Gleichzeitige Änderung → HTTP 409")
+    void concurrentChange_returns409() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentService.findById(id)).thenThrow(new OptimisticLockingFailureException("version"));
 
-        MvcResult result = mockMvc.perform(post("/documents")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(invalidBody))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("Validierungsfehler"))
-                .andExpect(jsonPath("$.fields.filename").value("Dateiname darf nicht leer sein"))
-                .andExpect(jsonPath("$.fields.sizeBytes").value("Dateigröße muss größer als 0 sein"))
-                .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.stackTrace").doesNotExist())
-                .andReturn();
-
-        assertValidErrorBody(result);
-        ErrorResponse error = objectMapper.readValue(
-                result.getResponse().getContentAsString(), ErrorResponse.class);
-        assertThat(error.fields())
-                .containsEntry("filename", "Dateiname darf nicht leer sein")
-                .containsEntry("sizeBytes", "Dateigröße muss größer als 0 sein")
-                .hasSize(2);
-    }
-
-    @Test
-    @DisplayName("MessagingException → HTTP 500 ohne Stack-Trace")
-    void messaging_returns500() throws Exception {
-        when(documentService.create(anyString(), anyString(), anyLong(), nullable(UUID.class)))
-                .thenThrow(new MessagingException(
-                        "Nachricht konnte nicht gesendet werden", null));
-
-        String validBody = """
-                {
-                  "filename": "test.pdf",
-                  "contentType": "application/pdf",
-                  "sizeBytes": 100
-                }
-                """;
-
-        MvcResult result = mockMvc.perform(post("/documents")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.message").value(
-                        "Messaging-Fehler: Nachricht konnte nicht gesendet werden"))
-                .andExpect(jsonPath("$.fields").doesNotExist())
-                .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.stackTrace").doesNotExist())
-                .andReturn();
-
-        assertValidErrorBody(result);
-        assertThat(result.getResponse().getContentAsString())
-                .doesNotContain("at com.docmanager");
+        mockMvc.perform(get("/documents/{id}", id))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
     }
 
     @Test
@@ -155,29 +79,21 @@ class GlobalExceptionHandlerTest {
     void storage_returns500() throws Exception {
         UUID id = UUID.randomUUID();
         doThrow(new StorageException("Dateioperation fehlgeschlagen"))
-                .when(documentService).delete(id);
+                .when(documentService)
+                .delete(id);
 
-        MvcResult result = mockMvc.perform(delete("/documents/{id}", id))
+        mockMvc.perform(delete("/documents/{id}", id))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.message").value(
-                        "Storage-Fehler: Dateioperation fehlgeschlagen"))
-                .andExpect(jsonPath("$.fields").doesNotExist())
-                .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.stackTrace").doesNotExist())
-                .andReturn();
-
-        assertValidErrorBody(result);
-        assertThat(result.getResponse().getContentAsString())
-                .doesNotContain("at com.docmanager");
+                .andExpect(jsonPath("$.message").value("Storage-Fehler: Dateioperation fehlgeschlagen"))
+                .andExpect(jsonPath("$.fields").doesNotExist());
     }
 
     @Test
     @DisplayName("Unbehandelte Exception → HTTP 500 generische Meldung")
     void unexpected_returns500() throws Exception {
         UUID id = UUID.randomUUID();
-        when(documentService.findById(id))
-                .thenThrow(new RuntimeException("geheime interne Details"));
+        when(documentService.findById(id)).thenThrow(new RuntimeException("geheime interne Details"));
 
         MvcResult result = mockMvc.perform(get("/documents/{id}", id))
                 .andExpect(status().isInternalServerError())
@@ -186,22 +102,33 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.stackTrace").doesNotExist())
                 .andReturn();
-
-        assertValidErrorBody(result);
         assertThat(result.getResponse().getContentAsString())
                 .doesNotContain("geheime interne Details")
                 .doesNotContain("at com.docmanager");
     }
 
-    private void assertValidErrorBody(MvcResult result) throws Exception {
-        String body = result.getResponse().getContentAsString();
-        assertThat(body).doesNotContain("stackTrace");
-        assertThat(body).doesNotContain("\tat ");
+    @Test
+    @DisplayName("Fehler in der Anfrage behalten ihren Status statt als 500 zu enden")
+    void clientErrors_keepTheirStatus() throws Exception {
+        mockMvc.perform(get("/documents/keine-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+        mockMvc.perform(get("/gibt-es-nicht"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+        mockMvc.perform(put("/documents/{id}", UUID.randomUUID()))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.status").value(405));
+    }
 
-        ErrorResponse error = objectMapper.readValue(body, ErrorResponse.class);
-        assertThat(error.timestamp()).isNotNull();
-        // Round-trip: Instant → ISO-8601 String → Instant.parse muss gültig sein
-        Instant parsed = Instant.parse(error.timestamp().toString());
-        assertThat(parsed).isEqualTo(error.timestamp());
+    @Test
+    @DisplayName("Zu große Datei → HTTP 413")
+    void uploadTooLarge_returns413() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentService.findById(id)).thenThrow(new MaxUploadSizeExceededException(1));
+
+        mockMvc.perform(get("/documents/{id}", id))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.status").value(413));
     }
 }

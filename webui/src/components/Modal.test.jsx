@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import Modal from './Modal.jsx'
-import ConfirmDialog from './ConfirmDialog.jsx'
 
 describe('Modal', () => {
   afterEach(cleanup)
@@ -36,16 +35,5 @@ describe('Modal', () => {
 
     expect(closeButton.disabled).toBe(true)
     expect(onClose).not.toHaveBeenCalled()
-  })
-})
-
-describe('ConfirmDialog', () => {
-  afterEach(cleanup)
-
-  it('sperrt beide Buttons, solange gelöscht wird', () => {
-    render(<ConfirmDialog title="Löschen" message="Wirklich?" busy onConfirm={vi.fn()} onCancel={vi.fn()} />)
-
-    expect(screen.getByRole('button', { name: 'Abbrechen' }).disabled).toBe(true)
-    expect(screen.getByRole('button', { name: 'Bitte warten…' }).disabled).toBe(true)
   })
 })

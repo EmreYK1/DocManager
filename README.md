@@ -62,15 +62,21 @@ Beim Start werden 9 Container gestartet:
 
 Die Daten liegen in Docker-Volumes und bleiben bei `docker compose down` erhalten. Erst `docker compose down -v` löscht sie.
 
-Falls auf deinem Rechner schon ein eigenes PostgreSQL auf Port 5432 läuft, verbindet sich alles, was lokal außerhalb von Docker startet (zum Beispiel die Backend-Tests), mit diesem und nicht mit dem Container. Das haben wir selbst erlebt. Dann hilft es, das lokale PostgreSQL zu stoppen oder die Variable `DB_URL` anzupassen.
+Falls auf deinem Rechner schon ein eigenes PostgreSQL auf Port 5432 läuft, verbindet sich alles, was lokal außerhalb von Docker startet (zum Beispiel das Backend per `java -jar`), mit diesem und nicht mit dem Container. Das haben wir selbst erlebt. Dann hilft es, das lokale PostgreSQL zu stoppen oder die Variable `DB_URL` anzupassen.
 
 ## Was nach einem Upload passiert
 
-1. Die Oberfläche schickt das PDF an `POST /api/documents/upload`. Das Backend prüft, ob es wirklich ein PDF ist, legt die Datei in MinIO ab und speichert die Angaben dazu in der Datenbank. Das Dokument bekommt den Status `OCR_PENDING`. Danach schickt das Backend eine Nachricht an RabbitMQ.
-2. Der `ocr-worker` nimmt die Nachricht, holt das PDF aus MinIO und wandelt es mit Ghostscript in Bilder um. Tesseract liest den Text von jeder Seite. Das Ergebnis, oder bei einem Fehler eine Fehlermeldung, schickt er wieder über RabbitMQ zurück.
-3. Diese Antwort bekommen zwei Dienste. Das Backend speichert den Text und setzt den Status auf `OCR_DONE`. Ist etwas schiefgegangen, wird der Status `FAILED`. Der `indexing-worker` schreibt Dateiname und Text in Elasticsearch.
-4. Bei einer Suche fragt das Backend Elasticsearch nach den passenden Dokumenten und holt sie dann aus der Datenbank. Löscht man ein Dokument, wird auch sein Eintrag im Index entfernt.
+1. Die Oberfläche schickt das PDF an `POST /api/documents/upload`. Das Backend prüft den Content-Type und ob die Datei mit `%PDF-` beginnt, legt die Datei in MinIO ab und speichert das Dokument mit dem Status `OCR_PENDING`. In derselben Datenbank-Transaktion merkt es den OCR-Auftrag in einer Outbox-Tabelle vor und sendet ihn kurz danach an RabbitMQ.
+2. Der `ocr-worker` holt das PDF aus MinIO und wandelt es mit Ghostscript in Bilder um. Tesseract liest den Text von jeder Seite. Das Ergebnis, oder bei einem unlesbaren PDF eine Fehlermeldung, schickt er zurück.
+3. Das Backend speichert den Text und setzt den Status auf `OCR_DONE` oder `FAILED`. Danach beauftragt es den `indexing-worker`, Dateiname und Text in Elasticsearch zu schreiben. Auch beim Umbenennen und Löschen bekommt der `indexing-worker` einen Auftrag. Nur er schreibt in den Index, und alle Aufträge laufen durch dieselbe Queue.
+4. Bei einer Suche fragt das Backend Elasticsearch nach den passenden Dokumenten und holt sie dann aus der Datenbank.
 5. Solange ein Dokument auf `OCR_PENDING` steht, lädt die Oberfläche die Liste alle 3 Sekunden neu (höchstens 5 Minuten lang). So sieht man den neuen Status, ohne die Seite neu zu laden.
+
+### Wenn etwas ausfällt
+
+- Ist RabbitMQ nicht erreichbar, bleiben die Nachrichten in der Outbox und werden später gesendet. Der Upload funktioniert trotzdem.
+- Schlägt die Verarbeitung einer Nachricht fehl, wird sie viermal versucht (mit 1, 3 und 9 Sekunden Abstand). Danach landet sie in der Queue `docmanager.dead-letter`. Dort kann man sie in der RabbitMQ-Verwaltung ansehen und erneut senden. Ein gescheiterter OCR-Auftrag setzt das Dokument außerdem auf `FAILED`.
+- Kommt eine Nachricht doppelt an, schadet das nicht.
 
 In der Oberfläche zeigen wir statt der Statuswerte aus der API einen verständlichen Text an: `OCR_PENDING` heißt dort "Text wird erkannt...", `OCR_DONE` heißt "Durchsuchbar" und `FAILED` heißt "Texterkennung fehlgeschlagen". Die Werte `UPLOADED` und `SUMMARY_DONE` gibt es im Datenmodell auch, sie werden aber im Moment nicht automatisch gesetzt.
 
@@ -121,7 +127,7 @@ Wenn etwas nicht klappt:
 
 ## REST-API
 
-Alle Pfade sind über die Oberfläche unter `/api` erreichbar, zum Beispiel `http://localhost/api/documents`. Das Präfix `/api` entfernt nginx, das Backend selbst kennt nur `/documents`. Fehler haben die Form `{"status": 404, "message": "..."}`. Eine unbekannte ID ergibt `404`, eine ungültige Eingabe `400`, ein Ordner, der noch benutzt wird, `409`, und wenn die Suche nicht erreichbar ist, kommt `503`.
+Alle Pfade sind über die Oberfläche unter `/api` erreichbar, zum Beispiel `http://localhost/api/documents`. Das Präfix `/api` entfernt nginx, das Backend selbst kennt nur `/documents`. Fehler haben die Form `{"status": 404, "message": "..."}`. Eine unbekannte ID ergibt `404` (auch ein Kommentar, der zu einem anderen Dokument gehört), eine ungültige Eingabe `400`, ein Ordner, der noch benutzt wird, oder eine gleichzeitige Änderung `409`, und wenn die Suche nicht erreichbar ist, kommt `503`.
 
 ### Dokumente
 
@@ -133,7 +139,6 @@ Alle Pfade sind über die Oberfläche unter `/api` erreichbar, zum Beispiel `htt
 | GET | `/documents/{id}` | ein Dokument, mit erkanntem Text |
 | PATCH | `/documents/{id}` | Dokument teilweise ändern |
 | DELETE | `/documents/{id}` | Dokument löschen (mit Kommentaren, Datei und Index-Eintrag) |
-| POST | `/documents` | Dokument nur mit Angaben anlegen, ohne Datei |
 
 Beim Upload schickt man ein Formular (`multipart/form-data`) mit dem Feld `file` und optional mit `folderId`. Die Antwort ist `201` mit dem neuen Dokument. Ist die Datei kein PDF oder leer, kommt `400`.
 
@@ -159,18 +164,15 @@ Bei der Suche ist der Parameter `q` Pflicht. Fehlt er oder ist er leer, kommt `4
 }
 ```
 
-Beim Ändern mit `PATCH` sind alle Felder optional. Mit `clearFolder: true` nimmt man ein Dokument aus seinem Ordner heraus:
+Beim Ändern mit `PATCH` sind alle Felder optional. Mit `clearFolder: true` nimmt man ein Dokument aus seinem Ordner heraus. Den Status kann man nicht setzen, er ergibt sich aus der Texterkennung.
 
 ```json
 {
   "filename": "neu.pdf",
-  "status": "OCR_DONE",
   "folderId": "uuid-des-ordners",
   "clearFolder": false
 }
 ```
-
-`POST /documents` legt nur einen Eintrag ohne Datei an. Weil es dann nichts zum Lesen gibt, wird so ein Dokument `FAILED`. Die Oberfläche benutzt diesen Endpunkt nicht mehr und lädt immer über `/documents/upload` hoch.
 
 ### Ordner
 
@@ -183,7 +185,7 @@ Beim Ändern mit `PATCH` sind alle Felder optional. Mit `clearFolder: true` nimm
 | PUT | `/folders/{id}` | umbenennen oder verschieben |
 | DELETE | `/folders/{id}` | löschen (nur wenn er leer ist, sonst `409`) |
 
-Anlegen und Ändern benutzen denselben Body. Ohne `parentId` entsteht ein Ordner auf der obersten Ebene. Der `name` ist Pflicht und darf höchstens 255 Zeichen lang sein.
+Anlegen und Ändern benutzen denselben Body. Ein Ordner kann nicht in sich selbst oder in einen seiner Unterordner verschoben werden (`400`). Ohne `parentId` entsteht ein Ordner auf der obersten Ebene. Der `name` ist Pflicht und darf höchstens 255 Zeichen lang sein.
 
 ```json
 {
@@ -230,7 +232,9 @@ Der `ocr-worker` nutzt dieselben Variablen für RabbitMQ und MinIO. Dazu kommen:
 
 Der `indexing-worker` braucht die Variablen für RabbitMQ sowie `ELASTICSEARCH_URL` und `ELASTICSEARCH_INDEX`.
 
-Die Namen von Exchange, Queues und Routing-Keys lassen sich auch über Variablen ändern (zum Beispiel `RABBITMQ_EXCHANGE`). Die Standardwerte passen aber zusammen, man muss sie normalerweise nicht anfassen.
+Die Namen von Exchange, Queues und Routing-Keys stehen an einer Stelle: `MessagingTopology` im Modul `messaging-contract`.
+
+Das Datenbankschema verwaltet Flyway (`document-service/src/main/resources/db/migration`). Änderungen kommen als neues Skript dazu. Eine ältere Datenbank ohne Flyway wird beim Start automatisch übernommen.
 
 ## Entwickeln und Testen
 
@@ -255,45 +259,55 @@ npm install
 npm run dev
 ```
 
-Tests:
+Tests und Prüfungen:
 
 ```bash
-mvn test            # Backend, alle Module
-cd webui && npm test   # Oberfläche
+mvn test                       # Backend, alle Module (braucht Docker)
+mvn spotless:apply             # Java-Code formatieren
+
+cd webui
+npm test                       # Oberfläche
+npm run lint                   # ESLint und Prettier ("npm run format" formatiert)
+npm run typecheck              # TypeScript im Ordner api
+
+npx playwright install chromium   # einmalig
+npm run e2e                    # Browsertest gegen den laufenden Docker-Stack
 ```
 
-Die meisten Backend-Tests sind Unit-Tests, bei denen Repositories, MinIO, RabbitMQ und Elasticsearch gemockt sind. Eine Ausnahme ist `RabbitMQConfigTest`: Er startet den kompletten Spring-Kontext und braucht dafür eine erreichbare PostgreSQL-Datenbank, lokal zum Beispiel mit `docker compose up -d db`. RabbitMQ, MinIO und Elasticsearch müssen dafür nicht laufen. In der CI laufen PostgreSQL, RabbitMQ und MinIO als Dienste mit.
+Die meisten Backend-Tests sind Unit-Tests. `DocumentFlowIntegrationTest` prüft den Weg eines Dokuments durch das echte Backend. PostgreSQL, RabbitMQ und MinIO startet er selbst als Container (Testcontainers), dafür muss nur Docker laufen. `ArchitectureTest` prüft, dass die Schichten eingehalten werden.
 
 Der Test `TesseractOcrServiceRealTest` im `ocr-worker` liest das echte `HelloWorld.pdf`. Er läuft nur, wenn Tesseract und Ghostscript installiert sind, sonst wird er übersprungen. Die Tests der Oberfläche benutzen Vitest und Testing Library und mocken die API.
 
 ## Technik
 
-- Oberfläche: React 18, Vite, React Router
+- Oberfläche: React 18, Vite, React Router, TypeScript für die API-Schicht
 - Backend: Java 25, Spring Boot 3.5, Spring Data JPA, Spring AMQP
-- Datenbank: PostgreSQL 17
+- Datenbank: PostgreSQL 17, Schema mit Flyway
 - Dateien: MinIO
 - Nachrichten: RabbitMQ
 - Texterkennung: Ghostscript und Tesseract
 - Suche: Elasticsearch 8, dazu Kibana zum Nachschauen
 - Webserver: nginx
-- Tests: JUnit 5 und Mockito, Vitest und Testing Library
+- Tests: JUnit 5, Mockito, Testcontainers, ArchUnit, Vitest, Testing Library, Playwright
+- Codestil: Spotless, ESLint, Prettier
 - Betrieb: Docker und Docker Compose, CI mit GitHub Actions
 
 ## Projektstruktur
 
 ```
 DocManager/
+├── messaging-contract/   Nachrichten und Queues, die sich alle Dienste teilen
 ├── document-service/     Backend (Spring Boot, REST-API, Upload, Suche)
 ├── ocr-worker/           liest den Text aus den PDFs
 ├── indexing-worker/      schreibt den Text in Elasticsearch
 ├── webui/                Oberfläche (React) mit nginx
 ├── docs/samples/         Beispiel-PDF für Tests und Abnahme
 ├── docker-compose.yml    startet alle 9 Container
-├── .github/workflows/    CI (Tests für Backend und Oberfläche)
-└── pom.xml               Maven-Projekt für die drei Java-Module
+├── .github/workflows/    CI (Stil, Typen, Tests und Browsertest)
+└── pom.xml               Maven-Projekt für die vier Java-Module
 ```
 
-Im Backend ist der Code nach Aufgaben getrennt: `controller` (REST), `service` (Logik, jeweils als Interface mit Umsetzung in `impl`), `repository`, `entity`, `dto`, `mapper`, `messaging` (RabbitMQ) und `exception`. In der Oberfläche liegen die Seiten in `pages`, die wiederverwendbaren Teile in `components`, die Aufrufe an das Backend in `api` und die Prüfungen für Eingaben in `validation`.
+Im Backend ist der Code nach Aufgaben getrennt: `controller` (REST), `service` (Logik; Interfaces gibt es nur für Zugriffe nach außen wie Speicher und Suche, die Umsetzung liegt in `impl`), `outbox` (vorgemerkte Nachrichten), `repository`, `entity`, `dto`, `mapper`, `messaging` (RabbitMQ) und `exception`. In der Oberfläche liegen die Seiten in `pages`, die wiederverwendbaren Teile in `components`, die Aufrufe an das Backend in `api` und die Prüfungen für Eingaben in `validation`.
 
 ## Was noch fehlt
 

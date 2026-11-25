@@ -1,10 +1,12 @@
 package com.docmanager.indexing.service;
 
-import com.docmanager.indexing.exception.IndexingException;
-
 import java.util.UUID;
 
 public interface SearchIndex {
 
-    void index(UUID documentId, String filename, String content) throws IndexingException;
+    /** Legt den Eintrag an oder ersetzt ihn. */
+    void index(UUID documentId, String filename, String content);
+
+    /** Ein nicht vorhandener Eintrag ist kein Fehler. */
+    void delete(UUID documentId);
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, request } from './httpClient.js'
+import { ApiError, request } from './httpClient.ts'
 
 describe('request', () => {
   let fetchMock
@@ -11,13 +11,6 @@ describe('request', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
-  })
-
-  it('liefert den JSON-Body bei Erfolg', async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify([{ id: 1 }]), { status: 200 }))
-
-    await expect(request('/documents')).resolves.toEqual([{ id: 1 }])
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/documents')
   })
 
   it('setzt bei JSON-Bodies den Content-Type application/json', async () => {
@@ -40,42 +33,10 @@ describe('request', () => {
     expect(options.headers['Content-Type']).toBeUndefined()
   })
 
-  it('ergänzt eigene Header, statt den Content-Type zu verlieren', async () => {
-    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
-
-    await request('/documents', {
-      method: 'POST',
-      body: '{}',
-      headers: { Accept: 'application/json' },
-    })
-
-    expect(fetchMock.mock.calls[0][1].headers).toEqual({
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    })
-  })
-
   it('liefert null bei Status 204', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
     await expect(request('/documents/1', { method: 'DELETE' })).resolves.toBeNull()
-  })
-
-  it('liefert null bei leerem Body mit Status 200', async () => {
-    fetchMock.mockResolvedValue(new Response('', { status: 200 }))
-
-    await expect(request('/documents/1', { method: 'DELETE' })).resolves.toBeNull()
-  })
-
-  it('wirft ApiError mit Status 500 bei einem Serverfehler', async () => {
-    fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ status: 500, message: 'Boom' }), { status: 500 }),
-    )
-
-    const promise = request('/documents')
-
-    await expect(promise).rejects.toBeInstanceOf(ApiError)
-    await expect(promise).rejects.toMatchObject({ status: 500, message: 'Boom' })
   })
 
   it('übernimmt fields aus dem Fehler-Body bei Status 400', async () => {

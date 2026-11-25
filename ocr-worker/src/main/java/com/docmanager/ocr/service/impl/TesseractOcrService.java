@@ -27,11 +27,12 @@ public class TesseractOcrService implements OcrService {
     private final String ghostscriptCommand;
     private final String tesseractCommand;
 
-    public TesseractOcrService(ProcessRunner processRunner,
-                               @Value("${app.ocr.language:deu+eng}") String language,
-                               @Value("${app.ocr.timeout-seconds:120}") long timeoutSeconds,
-                               @Value("${app.ocr.ghostscript-command:gs}") String ghostscriptCommand,
-                               @Value("${app.ocr.tesseract-command:tesseract}") String tesseractCommand) {
+    public TesseractOcrService(
+            ProcessRunner processRunner,
+            @Value("${app.ocr.language:deu+eng}") String language,
+            @Value("${app.ocr.timeout-seconds:120}") long timeoutSeconds,
+            @Value("${app.ocr.ghostscript-command:gs}") String ghostscriptCommand,
+            @Value("${app.ocr.tesseract-command:tesseract}") String tesseractCommand) {
         this.processRunner = processRunner;
         this.language = language;
         this.timeout = Duration.ofSeconds(timeoutSeconds);
@@ -45,15 +46,23 @@ public class TesseractOcrService implements OcrService {
         try {
             tempDir = Files.createTempDirectory("ocr-pages-");
 
-            runChecked("Ghostscript", List.of(
-                    ghostscriptCommand, "-dNOPAUSE", "-dBATCH", "-dSAFER",
-                    "-sDEVICE=png16m", "-r300",
-                    "-sOutputFile=" + tempDir.resolve("page-%03d.png"),
-                    pdf.toAbsolutePath().toString()));
+            runChecked(
+                    "Ghostscript",
+                    List.of(
+                            ghostscriptCommand,
+                            "-dNOPAUSE",
+                            "-dBATCH",
+                            "-dSAFER",
+                            "-sDEVICE=png16m",
+                            "-r300",
+                            "-sOutputFile=" + tempDir.resolve("page-%03d.png"),
+                            pdf.toAbsolutePath().toString()));
 
             List<Path> pages;
             try (Stream<Path> files = Files.list(tempDir)) {
-                pages = files.filter(p -> p.getFileName().toString().endsWith(".png")).sorted().toList();
+                pages = files.filter(p -> p.getFileName().toString().endsWith(".png"))
+                        .sorted()
+                        .toList();
             }
             if (pages.isEmpty()) {
                 throw new OcrException("Ghostscript hat keine Seiten erzeugt");
@@ -61,8 +70,9 @@ public class TesseractOcrService implements OcrService {
 
             List<String> texts = new ArrayList<>();
             for (Path page : pages) {
-                ProcessRunner.Result result = runChecked("Tesseract", List.of(
-                        tesseractCommand, page.toAbsolutePath().toString(), "stdout", "-l", language));
+                ProcessRunner.Result result = runChecked(
+                        "Tesseract",
+                        List.of(tesseractCommand, page.toAbsolutePath().toString(), "stdout", "-l", language));
                 texts.add(result.stdout().trim());
             }
             String text = String.join("\n", texts).trim();

@@ -17,8 +17,7 @@ public class MinioDocumentStore implements DocumentStore {
     private final MinioClient minioClient;
     private final String bucket;
 
-    public MinioDocumentStore(MinioClient minioClient,
-                              @Value("${app.minio.bucket}") String bucket) {
+    public MinioDocumentStore(MinioClient minioClient, @Value("${app.minio.bucket}") String bucket) {
         this.minioClient = minioClient;
         this.bucket = bucket;
     }
@@ -27,15 +26,10 @@ public class MinioDocumentStore implements DocumentStore {
     public InputStream loadDocument(String objectKey) {
         try {
             return minioClient.getObject(
-                    GetObjectArgs.builder()
-                            .bucket(bucket)
-                            .object(objectKey)
-                            .build()
-            );
+                    GetObjectArgs.builder().bucket(bucket).object(objectKey).build());
         } catch (Exception e) {
             log.error("Fehler beim Laden des Dokuments aus MinIO: bucket={}, objectKey={}", bucket, objectKey, e);
             throw new StorageException("Dokument konnte nicht aus MinIO geladen werden: " + objectKey, e);
         }
     }
 }
-

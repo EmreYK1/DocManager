@@ -3,3 +3,6 @@
 *.class
 node_modules/
 webui/dist/
+.DS_Store
+webui/playwright-report/
+webui/test-results/

@@ -6,4 +6,3 @@ public class InvalidFileException extends RuntimeException {
         super(message);
     }
 }
-

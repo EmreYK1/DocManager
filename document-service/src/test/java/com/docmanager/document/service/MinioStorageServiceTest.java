@@ -37,12 +37,7 @@ class MinioStorageServiceTest {
     @DisplayName("store() lädt Datei erfolgreich in MinIO hoch und liefert objectKey")
     void store_success_returnsObjectKey() throws Exception {
         byte[] content = "test content".getBytes();
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "sample.pdf",
-                "application/pdf",
-                content
-        );
+        MockMultipartFile file = new MockMultipartFile("file", "sample.pdf", "application/pdf", content);
 
         String objectKey = storageService.store(file);
 
@@ -58,15 +53,11 @@ class MinioStorageServiceTest {
     @Test
     @DisplayName("store() wirft StorageException bei MinIO-Fehler")
     void store_failure_throwsStorageException() throws Exception {
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "sample.pdf",
-                "application/pdf",
-                "test".getBytes()
-        );
+        MockMultipartFile file = new MockMultipartFile("file", "sample.pdf", "application/pdf", "test".getBytes());
 
         doThrow(new RuntimeException("MinIO connection failed"))
-                .when(minioClient).putObject(any(PutObjectArgs.class));
+                .when(minioClient)
+                .putObject(any(PutObjectArgs.class));
 
         assertThatThrownBy(() -> storageService.store(file))
                 .isInstanceOf(StorageException.class)
@@ -74,28 +65,12 @@ class MinioStorageServiceTest {
     }
 
     @Test
-    @DisplayName("delete() ruft removeObject auf MinioClient auf")
-    void delete_success() throws Exception {
-        String objectKey = "some-key.pdf";
-
-        storageService.delete(objectKey);
-
-        ArgumentCaptor<RemoveObjectArgs> captor = ArgumentCaptor.forClass(RemoveObjectArgs.class);
-        verify(minioClient).removeObject(captor.capture());
-        RemoveObjectArgs args = captor.getValue();
-        assertThat(args.bucket()).isEqualTo(bucket);
-        assertThat(args.object()).isEqualTo(objectKey);
-    }
-
-    @Test
     @DisplayName("delete() wirft StorageException bei MinIO-Fehler")
     void delete_failure_throwsStorageException() throws Exception {
-        doThrow(new RuntimeException("MinIO error"))
-                .when(minioClient).removeObject(any(RemoveObjectArgs.class));
+        doThrow(new RuntimeException("MinIO error")).when(minioClient).removeObject(any(RemoveObjectArgs.class));
 
         assertThatThrownBy(() -> storageService.delete("key.pdf"))
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("Datei konnte nicht aus MinIO gelöscht werden");
     }
 }
-

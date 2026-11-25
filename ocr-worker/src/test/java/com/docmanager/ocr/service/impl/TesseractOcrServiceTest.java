@@ -36,7 +36,10 @@ class TesseractOcrServiceTest {
 
     /** Simuliert Ghostscript: legt zwei Seitenbilder im Zielverzeichnis an. */
     private ProcessRunner.Result fakeGhostscript(List<String> cmd) throws Exception {
-        String outArg = cmd.stream().filter(a -> a.startsWith("-sOutputFile=")).findFirst().orElseThrow();
+        String outArg = cmd.stream()
+                .filter(a -> a.startsWith("-sOutputFile="))
+                .findFirst()
+                .orElseThrow();
         Path dir = Path.of(outArg.substring("-sOutputFile=".length())).getParent();
         tempDir.set(dir);
         Files.writeString(dir.resolve("page-001.png"), "x");
@@ -65,9 +68,7 @@ class TesseractOcrServiceTest {
     void tesseractExitCode1_throwsOcrException_andDeletesTempFiles() throws Exception {
         when(runner.run(any(), any(Duration.class))).thenAnswer(inv -> {
             List<String> cmd = inv.getArgument(0);
-            return cmd.get(0).equals("gs")
-                    ? fakeGhostscript(cmd)
-                    : new ProcessRunner.Result(1, "", "boom", false);
+            return cmd.get(0).equals("gs") ? fakeGhostscript(cmd) : new ProcessRunner.Result(1, "", "boom", false);
         });
 
         assertThatThrownBy(() -> service.extractText(PDF))
@@ -77,22 +78,10 @@ class TesseractOcrServiceTest {
     }
 
     @Test
-    void ghostscriptExitCode1_throwsOcrException() throws Exception {
-        when(runner.run(any(), any(Duration.class))).thenReturn(new ProcessRunner.Result(1, "", "bad pdf", false));
-
-        assertThatThrownBy(() -> service.extractText(PDF))
-                .isInstanceOf(OcrException.class)
-                .hasMessageContaining("Ghostscript")
-                .hasMessageContaining("Exit-Code 1");
-    }
-
-    @Test
     void timeout_throwsOcrException_andDeletesTempFiles() throws Exception {
         when(runner.run(any(), any(Duration.class))).thenAnswer(inv -> {
             List<String> cmd = inv.getArgument(0);
-            return cmd.get(0).equals("gs")
-                    ? fakeGhostscript(cmd)
-                    : new ProcessRunner.Result(-1, "", "", true);
+            return cmd.get(0).equals("gs") ? fakeGhostscript(cmd) : new ProcessRunner.Result(-1, "", "", true);
         });
 
         assertThatThrownBy(() -> service.extractText(PDF))

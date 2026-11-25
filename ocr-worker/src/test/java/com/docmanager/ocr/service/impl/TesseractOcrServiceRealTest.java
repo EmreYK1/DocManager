@@ -16,7 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TesseractOcrServiceRealTest {
 
     static boolean toolsInstalled() {
-        return available("tesseract", "--version") && (available("gs", "--version") || available("gswin64c", "--version"));
+        return available("tesseract", "--version")
+                && (available("gs", "--version") || available("gswin64c", "--version"));
     }
 
     private static boolean available(String... cmd) {

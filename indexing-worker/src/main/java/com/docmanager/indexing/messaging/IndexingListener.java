@@ -1,12 +1,12 @@
 package com.docmanager.indexing.messaging;
 
-import com.docmanager.indexing.exception.IndexingException;
 import com.docmanager.indexing.service.SearchIndex;
-import lombok.extern.slf4j.Slf4j;
+import com.docmanager.messaging.IndexMessage;
+import com.docmanager.messaging.MessagingTopology;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-@Slf4j
+/** Fehler werden nicht abgefangen: Sie lösen die Wiederholung aus. Beide Aktionen sind idempotent. */
 @Component
 public class IndexingListener {
 
@@ -16,23 +16,12 @@ public class IndexingListener {
         this.searchIndex = searchIndex;
     }
 
-    @RabbitListener(queues = "${app.rabbitmq.queue.indexing}")
-    public void handleOcrResult(OcrResultMessage message) {
-        if (message == null || message.documentId() == null) {
-            log.warn("Ungültige Indexing-Nachricht empfangen: null");
-            return;
-        }
-
-        if (!message.success()) {
-            log.info("OCR-Ergebnis ohne Erfolg übersprungen: id={}, grund={}",
-                    message.documentId(), message.errorMessage());
-            return;
-        }
-
-        try {
-            searchIndex.index(message.documentId(), message.filename(), message.text());
-        } catch (IndexingException e) {
-            log.error("Indexierung fehlgeschlagen für Dokument-ID: {}", message.documentId(), e);
+    @RabbitListener(queues = MessagingTopology.INDEX_QUEUE)
+    public void handle(IndexMessage message) {
+        if (message.deleted()) {
+            searchIndex.delete(message.documentId());
+        } else {
+            searchIndex.index(message.documentId(), message.filename(), message.content());
         }
     }
 }
