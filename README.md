@@ -245,7 +245,7 @@ Der `ocr-worker` nutzt dieselben Variablen für RabbitMQ und MinIO. Dazu kommen:
 
 Der `indexing-worker` braucht die Variablen für RabbitMQ sowie `ELASTICSEARCH_URL` und `ELASTICSEARCH_INDEX`.
 
-Der `genai-worker` braucht die Variablen für RabbitMQ. Dazu nutzt er `GEMINI_API_KEY` (nötig für Gemini) und `GEMINI_MODEL` (Standard `gemini-3.8-flash`). Ohne Docker liest er die `.env` nicht, dann müssen die Variablen im Terminal gesetzt sein.
+Der `genai-worker` braucht die Variablen für RabbitMQ. Dazu nutzt er `GEMINI_API_KEY` (nötig für Gemini) und `GEMINI_MODEL` (Standard `gemini-3.8-flash`), `GEMINI_TIMEOUT` (Standard `60s`) und `GEMINI_MAX_INPUT_CHARS` (Standard `100000`, längerer Text wird gekürzt). Ohne Docker liest er die `.env` nicht, dann müssen die Variablen im Terminal gesetzt sein.
 
 Die Namen von Exchange, Queues und Routing-Keys stehen an einer Stelle: `MessagingTopology` im Modul `messaging-contract`.
 
@@ -287,6 +287,8 @@ npm run typecheck              # TypeScript im Ordner api
 ```
 
 Die meisten Backend-Tests sind Unit-Tests. `DocumentFlowIntegrationTest` prüft den Weg eines Dokuments durch das echte Backend. PostgreSQL, RabbitMQ und MinIO startet er selbst als Container (Testcontainers), dafür muss nur Docker laufen.
+
+Der Test `GeminiSummaryServiceRealTest` im `genai-worker` ruft die echte Gemini-API auf. Er läuft nur, wenn `GEMINI_API_KEY` im Terminal gesetzt ist, sonst wird er übersprungen. Die anderen Tests simulieren die API.
 
 Der Test `TesseractOcrServiceRealTest` im `ocr-worker` liest das echte `HelloWorld.pdf`. Er läuft nur, wenn Tesseract und Ghostscript installiert sind, sonst wird er übersprungen. Die Tests der Oberfläche benutzen Vitest und Testing Library und mocken die API.
 

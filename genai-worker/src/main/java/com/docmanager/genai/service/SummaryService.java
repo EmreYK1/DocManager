@@ -1,0 +1,11 @@
+package com.docmanager.genai.service;
+
+public interface SummaryService {
+
+    /**
+     * Fasst einen Text in wenigen deutschen Sätzen zusammen.
+     *
+     * @throws com.docmanager.genai.exception.SummaryException wenn keine Zusammenfassung erstellt werden konnte
+     */
+    String summarize(String text);
+}
